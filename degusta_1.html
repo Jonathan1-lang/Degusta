@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Degusta</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --orange: #FF6B00;
+    --orange-dark: #E55A00;
+    --white: #FFFFFF;
+    --gray-light: #F5F5F5;
+    --gray-mid: #E0E0E0;
+    --gray-text: #666;
+    --green: #2E7D32;
+    --green-bg: #E8F5E9;
+    --red: #C62828;
+    --red-bg: #FFEBEE;
+    --yellow: #F57F17;
+    --yellow-bg: #FFFDE7;
+    --header-h: 56px;
+    --tabs-h: 60px;
+  }
+
+  html, body {
+    height: 100%;
+    background: #ECECEC;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 16px;
+    color: #222;
+  }
+
+  .app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100%;
+    background: var(--white);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* HEADER */
+  .header {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 480px;
+    height: var(--header-h);
+    background: var(--orange);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    z-index: 100;
+    box-shadow: 0 2px 6px rgba(0,0,0,.2);
+  }
+
+  .header-title { color: var(--white); font-size: 22px; font-weight: 700; letter-spacing: .5px; }
+  .header-status { font-size: 13px; color: rgba(255,255,255,.85); margin-left: 8px; }
+
+  .btn-settings {
+    background: none; border: none; color: var(--white);
+    font-size: 22px; cursor: pointer; padding: 8px;
+    border-radius: 50%; transition: background .2s; line-height: 1;
+  }
+  .btn-settings:hover { background: rgba(255,255,255,.15); }
+
+  /* MAIN CONTENT */
+  .content {
+    margin-top: var(--header-h);
+    margin-bottom: var(--tabs-h);
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tab-panel { display: none; padding: 16px; padding-bottom: 24px; }
+  .tab-panel.active { display: block; }
+
+  /* BOTTOM TABS */
+  .tabs {
+    position: fixed;
+    bottom: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 100%; max-width: 480px;
+    height: var(--tabs-h);
+    background: var(--white);
+    border-top: 1px solid var(--gray-mid);
+    display: flex; z-index: 100;
+    box-shadow: 0 -2px 8px rgba(0,0,0,.08);
+  }
+
+  .tab-btn {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    border: none; background: none; cursor: pointer;
+    color: var(--gray-text); font-size: 11px; font-weight: 500;
+    gap: 3px; transition: color .2s; padding: 6px 0;
+  }
+  .tab-btn .tab-icon { font-size: 20px; }
+  .tab-btn.active { color: var(--orange); }
+
+  /* FORM ELEMENTS */
+  .form-section {
+    background: var(--gray-light);
+    border-radius: 12px; padding: 14px; margin-bottom: 14px;
+  }
+  .section-title {
+    font-size: 13px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .6px;
+    color: var(--gray-text); margin-bottom: 12px;
+  }
+  .field { margin-bottom: 12px; }
+  .field:last-child { margin-bottom: 0; }
+
+  label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 5px; }
+  label .req { color: var(--orange); }
+
+  input[type=text], input[type=date], input[type=time],
+  input[type=number], select, textarea {
+    width: 100%; padding: 12px;
+    border: 1.5px solid var(--gray-mid);
+    border-radius: 8px; font-size: 16px;
+    background: var(--white); color: #222;
+    appearance: none; -webkit-appearance: none;
+    outline: none; transition: border-color .2s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--orange); }
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px;
+  }
+  textarea { min-height: 80px; resize: vertical; }
+  input[type=number] { -moz-appearance: textfield; }
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+  /* ITEM ROWS */
+  .item-row {
+    background: var(--white); border-radius: 10px; padding: 12px;
+    margin-bottom: 10px; border: 1.5px solid var(--gray-mid); position: relative;
+  }
+  .item-row.collapsible {
+    overflow: hidden; max-height: 0; opacity: 0;
+    padding: 0 12px; margin-bottom: 0; border-width: 0;
+    transition: max-height .3s ease, opacity .3s ease, padding .3s ease,
+                margin-bottom .3s ease, border-width .3s ease;
+  }
+  .item-row.collapsible.show {
+    max-height: 300px; opacity: 1; padding: 12px;
+    margin-bottom: 10px; border-width: 1.5px;
+  }
+  .item-header {
+    display: flex; align-items: center;
+    justify-content: space-between; margin-bottom: 8px;
+  }
+  .item-label { font-size: 13px; font-weight: 600; color: #555; }
+  .btn-remove {
+    background: none; border: none; color: var(--red);
+    font-size: 20px; cursor: pointer; padding: 2px 6px;
+    line-height: 1; border-radius: 4px;
+  }
+  .btn-remove:hover { background: var(--red-bg); }
+  .row-2col {
+    display: grid; grid-template-columns: 1fr 80px;
+    gap: 8px; align-items: end;
+  }
+  .btn-add {
+    background: none; border: 1.5px dashed var(--orange);
+    color: var(--orange); border-radius: 8px; width: 100%;
+    padding: 10px; font-size: 14px; font-weight: 600;
+    cursor: pointer; margin-top: 4px; transition: background .2s;
+  }
+  .btn-add:hover { background: #FFF3E0; }
+
+  /* TOTAL BOX */
+  .total-box {
+    background: #FFF3E0; border: 2px solid var(--orange);
+    border-radius: 12px; padding: 14px; margin-bottom: 14px;
+  }
+  .total-box .total-title {
+    font-size: 13px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .6px; color: var(--orange); margin-bottom: 10px;
+  }
+  .total-line { display: flex; justify-content: space-between; font-size: 14px; color: #555; margin-bottom: 5px; }
+  .total-divider { border: none; border-top: 1px solid var(--orange); margin: 8px 0; opacity: .4; }
+  .total-final { display: flex; justify-content: space-between; font-size: 18px; font-weight: 700; color: var(--orange); }
+
+  /* BUTTONS */
+  .btn-submit {
+    width: 100%; height: 48px; background: var(--orange);
+    color: var(--white); border: none; border-radius: 10px;
+    font-size: 16px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; transition: background .2s, opacity .2s; margin-bottom: 8px;
+  }
+  .btn-submit:hover { background: var(--orange-dark); }
+  .btn-submit:disabled { opacity: .5; cursor: not-allowed; }
+
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,.4);
+    border-top-color: #fff; border-radius: 50%;
+    animation: spin .7s linear infinite; display: none;
+  }
+  .spinner.visible { display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* MESSAGES */
+  .msg { padding: 12px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 12px; display: none; line-height: 1.4; }
+  .msg.show { display: block; }
+  .msg.success { background: var(--green-bg); color: var(--green); border: 1px solid #A5D6A7; }
+  .msg.error   { background: var(--red-bg);   color: var(--red);   border: 1px solid #EF9A9A; }
+  .msg.warning { background: var(--yellow-bg); color: var(--yellow); border: 1px solid #FFF176; }
+
+  /* LOADING OVERLAY */
+  .loading-overlay {
+    display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 14px; padding: 60px 20px; text-align: center;
+  }
+  .loading-overlay.show { display: flex; }
+  .loading-spinner-lg {
+    width: 40px; height: 40px;
+    border: 4px solid var(--gray-mid); border-top-color: var(--orange);
+    border-radius: 50%; animation: spin .8s linear infinite;
+  }
+  .loading-text { color: var(--gray-text); font-size: 15px; }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.5); z-index: 200;
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: var(--white); border-radius: 16px; padding: 24px;
+    width: 100%; max-width: 420px; box-shadow: 0 8px 32px rgba(0,0,0,.2);
+  }
+  .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+  .modal-sub { font-size: 13px; color: var(--gray-text); margin-bottom: 18px; }
+  .modal-status {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px; border-radius: 8px; background: var(--gray-light);
+    font-size: 14px; margin-bottom: 14px; font-weight: 500;
+  }
+  .modal-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+  .btn-modal-primary {
+    height: 44px; background: var(--orange); color: var(--white);
+    border: none; border-radius: 8px; font-size: 15px; font-weight: 700;
+    cursor: pointer; transition: background .2s;
+  }
+  .btn-modal-primary:hover { background: var(--orange-dark); }
+  .btn-modal-secondary {
+    height: 44px; background: none; color: var(--orange);
+    border: 1.5px solid var(--orange); border-radius: 8px;
+    font-size: 15px; font-weight: 600; cursor: pointer; transition: background .2s;
+  }
+  .btn-modal-secondary:hover { background: #FFF3E0; }
+  .btn-modal-close {
+    height: 40px; background: none; color: var(--gray-text);
+    border: 1.5px solid var(--gray-mid); border-radius: 8px;
+    font-size: 14px; cursor: pointer;
+  }
+  .btn-retry {
+    margin-top: 12px; padding: 10px 24px; background: var(--orange);
+    color: white; border: none; border-radius: 8px;
+    font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+
+  /* AUTOCOMPLETE */
+  .ac-wrap { position: relative; }
+  .ac-input {
+    width: 100%; padding: 12px 36px 12px 12px;
+    border: 1.5px solid var(--gray-mid); border-radius: 8px;
+    font-size: 16px; background: var(--white); color: #222;
+    outline: none; transition: border-color .2s;
+  }
+  .ac-input:focus { border-color: var(--orange); }
+  .ac-input.has-value { border-color: var(--orange); background: #FFF8F3; }
+  .ac-clear {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: #aaa; font-size: 18px;
+    cursor: pointer; line-height: 1; padding: 4px; display: none;
+  }
+  .ac-clear.visible { display: block; }
+  .ac-dropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--white); border: 1.5px solid var(--orange);
+    border-radius: 8px; max-height: 220px; overflow-y: auto;
+    z-index: 150; box-shadow: 0 4px 16px rgba(0,0,0,.12);
+    display: none;
+  }
+  .ac-dropdown.open { display: block; }
+  .ac-option {
+    padding: 12px 14px; font-size: 15px; cursor: pointer;
+    border-bottom: 1px solid var(--gray-light); transition: background .15s;
+  }
+  .ac-option:last-child { border-bottom: none; }
+  .ac-option:hover, .ac-option.highlighted { background: #FFF3E0; color: var(--orange); }
+  .ac-option em { font-style: normal; font-weight: 700; color: var(--orange); }
+  .ac-empty { padding: 12px 14px; font-size: 14px; color: var(--gray-text); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="header">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="header-title">🍽️ Degusta</span>
+      <span class="header-status" id="headerStatus">🔴 Sin API Key</span>
+    </div>
+    <button class="btn-settings" onclick="openSettings()">⚙️</button>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="content">
+
+    <!-- LOADING OVERLAY -->
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="loading-spinner-lg"></div>
+      <p class="loading-text">Cargando catálogo...</p>
+    </div>
+
+    <!-- TAB 1: PEDIDO -->
+    <div class="tab-panel active" id="panel-pedido">
+      <div id="msgPedido" class="msg"></div>
+
+      <div class="form-section">
+        <div class="section-title">🧑 Cliente</div>
+        <div class="field">
+          <label>Cliente <span class="req">*</span></label>
+          <div class="ac-wrap" id="acWrap-cliente">
+            <input class="ac-input" id="acInput-cliente" type="text" placeholder="Buscar cliente..." autocomplete="off" oninput="acFilter('cliente')" onfocus="acOpen('cliente')" onkeydown="acKey(event,'cliente')">
+            <button class="ac-clear" id="acClear-cliente" onclick="acClear('cliente')">×</button>
+            <div class="ac-dropdown" id="acDrop-cliente"></div>
+          </div>
+          <input type="hidden" id="cliente">
+        </div>
+      </div>
+
+      <!-- PLATOS -->
+      <div class="form-section">
+        <div class="section-title">🍽️ Platos</div>
+        <div class="item-row" id="platoRow1">
+          <div class="item-header"><span class="item-label">Plato 1</span></div>
+          <div class="row-2col">
+            <div class="ac-wrap" id="acWrap-plato1">
+              <input class="ac-input" id="acInput-plato1" type="text" placeholder="Buscar plato..." autocomplete="off" oninput="acFilter('plato1')" onfocus="acOpen('plato1')" onkeydown="acKey(event,'plato1')">
+              <button class="ac-clear" id="acClear-plato1" onclick="acClear('plato1')">×</button>
+              <div class="ac-dropdown" id="acDrop-plato1"></div>
+              <input type="hidden" id="plato1">
+            </div>
+            <div>
+              <label style="font-size:12px;">Cant.</label>
+              <input type="number" id="cantPlato1" value="1" min="1" onchange="recalcTotal()">
+            </div>
+          </div>
+        </div>
+        <div class="item-row collapsible" id="platoRow2">
+          <div class="item-header">
+            <span class="item-label">Plato 2</span>
+            <button class="btn-remove" onclick="removePlato(2)">×</button>
+          </div>
+          <div class="row-2col">
+            <div class="ac-wrap" id="acWrap-plato2">
+              <input class="ac-input" id="acInput-plato2" type="text" placeholder="Buscar plato..." autocomplete="off" oninput="acFilter('plato2')" onfocus="acOpen('plato2')" onkeydown="acKey(event,'plato2')">
+              <button class="ac-clear" id="acClear-plato2" onclick="acClear('plato2')">×</button>
+              <div class="ac-dropdown" id="acDrop-plato2"></div>
+              <input type="hidden" id="plato2">
+            </div>
+            <div>
+              <label style="font-size:12px;">Cant.</label>
+              <input type="number" id="cantPlato2" value="1" min="1" onchange="recalcTotal()">
+            </div>
+          </div>
+        </div>
+        <div class="item-row collapsible" id="platoRow3">
+          <div class="item-header">
+            <span class="item-label">Plato 3</span>
+            <button class="btn-remove" onclick="removePlato(3)">×</button>
+          </div>
+          <div class="row-2col">
+            <div class="ac-wrap" id="acWrap-plato3">
+              <input class="ac-input" id="acInput-plato3" type="text" placeholder="Buscar plato..." autocomplete="off" oninput="acFilter('plato3')" onfocus="acOpen('plato3')" onkeydown="acKey(event,'plato3')">
+              <button class="ac-clear" id="acClear-plato3" onclick="acClear('plato3')">×</button>
+              <div class="ac-dropdown" id="acDrop-plato3"></div>
+              <input type="hidden" id="plato3">
+            </div>
+            <div>
+              <label style="font-size:12px;">Cant.</label>
+              <input type="number" id="cantPlato3" value="1" min="1" onchange="recalcTotal()">
+            </div>
+          </div>
+        </div>
+        <button class="btn-add" id="btnAddPlato" onclick="addPlato()">+ Agregar plato</button>
+      </div>
+
+      <!-- EXTRAS -->
+      <div class="form-section">
+        <div class="section-title">✨ Extras</div>
+        <div class="item-row" id="extraRow1">
+          <div class="item-header"><span class="item-label">Extra 1 <span style="font-weight:400;color:#999;">(opcional)</span></span></div>
+          <div class="row-2col">
+            <div class="ac-wrap" id="acWrap-extra1">
+              <input class="ac-input" id="acInput-extra1" type="text" placeholder="Buscar extra..." autocomplete="off" oninput="acFilter('extra1')" onfocus="acOpen('extra1')" onkeydown="acKey(event,'extra1')">
+              <button class="ac-clear" id="acClear-extra1" onclick="acClear('extra1')">×</button>
+              <div class="ac-dropdown" id="acDrop-extra1"></div>
+              <input type="hidden" id="extra1">
+            </div>
+            <div>
+              <label style="font-size:12px;">Cant.</label>
+              <input type="number" id="cantExtra1" value="1" min="1" onchange="recalcTotal()">
+            </div>
+          </div>
+        </div>
+        <div class="item-row collapsible" id="extraRow2">
+          <div class="item-header">
+            <span class="item-label">Extra 2</span>
+            <button class="btn-remove" onclick="removeExtra(2)">×</button>
+          </div>
+          <div class="row-2col">
+            <div class="ac-wrap" id="acWrap-extra2">
+              <input class="ac-input" id="acInput-extra2" type="text" placeholder="Buscar extra..." autocomplete="off" oninput="acFilter('extra2')" onfocus="acOpen('extra2')" onkeydown="acKey(event,'extra2')">
+              <button class="ac-clear" id="acClear-extra2" onclick="acClear('extra2')">×</button>
+              <div class="ac-dropdown" id="acDrop-extra2"></div>
+              <input type="hidden" id="extra2">
+            </div>
+            <div>
+              <label style="font-size:12px;">Cant.</label>
+              <input type="number" id="cantExtra2" value="1" min="1" onchange="recalcTotal()">
+            </div>
+          </div>
+        </div>
+        <div class="item-row collapsible" id="extraRow3">
+          <div class="item-header">
+            <span class="item-label">Extra 3</span>
+            <button class="btn-remove" onclick="removeExtra(3)">×</button>
+          </div>
+          <div class="row-2col">
+            <div class="ac-wrap" id="acWrap-extra3">
+              <input class="ac-input" id="acInput-extra3" type="text" placeholder="Buscar extra..." autocomplete="off" oninput="acFilter('extra3')" onfocus="acOpen('extra3')" onkeydown="acKey(event,'extra3')">
+              <button class="ac-clear" id="acClear-extra3" onclick="acClear('extra3')">×</button>
+              <div class="ac-dropdown" id="acDrop-extra3"></div>
+              <input type="hidden" id="extra3">
+            </div>
+            <div>
+              <label style="font-size:12px;">Cant.</label>
+              <input type="number" id="cantExtra3" value="1" min="1" onchange="recalcTotal()">
+            </div>
+          </div>
+        </div>
+        <button class="btn-add" id="btnAddExtra" onclick="addExtra()">+ Agregar extra</button>
+      </div>
+
+      <!-- PAGO Y ESTADO -->
+      <div class="form-section">
+        <div class="section-title">💳 Pago y estado</div>
+        <div class="field">
+          <label for="metodoPago">Método de pago <span class="req">*</span></label>
+          <select id="metodoPago"><option value="">— Selecciona —</option></select>
+        </div>
+        <div class="field">
+          <label for="estado">Estado <span class="req">*</span></label>
+          <select id="estado">
+            <option value="Pendiente" selected>Pendiente</option>
+            <option value="Preparando">Preparando</option>
+            <option value="En camino">En camino</option>
+            <option value="Entregado">Entregado</option>
+            <option value="Cancelado">Cancelado</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- DETALLES -->
+      <div class="form-section">
+        <div class="section-title">📝 Detalles adicionales</div>
+        <div class="field">
+          <label for="notas">Notas <span style="font-weight:400;color:#999;">(opcional)</span></label>
+          <textarea id="notas" placeholder="Instrucciones especiales, alergias..."></textarea>
+        </div>
+        <div class="field">
+          <label for="direccion">Dirección de entrega <span style="font-weight:400;color:#999;">(opcional)</span></label>
+          <input type="text" id="direccion" placeholder="Calle, número, referencias...">
+        </div>
+        <div class="field">
+          <label for="descuento">Descuento ($)</label>
+          <input type="number" id="descuento" value="0" min="0" step="0.01" onchange="recalcTotal()">
+        </div>
+        <div class="field">
+          <label for="propina">Propina ($)</label>
+          <input type="number" id="propina" value="0" min="0" step="0.01" onchange="recalcTotal()">
+        </div>
+      </div>
+
+      <!-- TOTAL -->
+      <div class="total-box">
+        <div class="total-title">💰 Total estimado</div>
+        <div class="total-line"><span>Subtotal platos:</span><span id="tSubPlatos">$0.00</span></div>
+        <div class="total-line"><span>Subtotal extras:</span><span id="tSubExtras">$0.00</span></div>
+        <div class="total-line"><span>Descuento:</span><span id="tDescuento">-$0.00</span></div>
+        <div class="total-line"><span>Propina:</span><span id="tPropina">+$0.00</span></div>
+        <hr class="total-divider">
+        <div class="total-final"><span>TOTAL:</span><span id="tTotal">$0.00</span></div>
+      </div>
+
+      <button class="btn-submit" id="btnSubmitPedido" onclick="submitPedido()">
+        <span class="spinner" id="spinnerPedido"></span>
+        <span id="btnPedidoText">Registrar pedido</span>
+      </button>
+    </div>
+
+    <!-- TAB 2: CLIENTE -->
+    <div class="tab-panel" id="panel-cliente">
+      <div id="msgCliente" class="msg"></div>
+      <div class="form-section">
+        <div class="section-title">👤 Nuevo cliente</div>
+        <div class="field">
+          <label for="cliNombre">Nombre completo <span class="req">*</span></label>
+          <input type="text" id="cliNombre" placeholder="Nombre y referencias">
+        </div>
+        <div class="field">
+          <label for="cliTel">Teléfono <span style="font-weight:400;color:#999;">(opcional)</span></label>
+          <input type="text" id="cliTel" placeholder="+503 7000 0000">
+        </div>
+        <div class="field">
+          <label for="cliDir">Dirección <span style="font-weight:400;color:#999;">(opcional)</span></label>
+          <input type="text" id="cliDir" placeholder="Colonia, calle, número...">
+        </div>
+      </div>
+      <button class="btn-submit" id="btnSubmitCliente" onclick="submitCliente()">
+        <span class="spinner" id="spinnerCliente"></span>
+        <span id="btnClienteText">Registrar cliente</span>
+      </button>
+    </div>
+
+  </main>
+
+  <!-- BOTTOM TABS -->
+  <nav class="tabs">
+    <button class="tab-btn active" id="tab-pedido" onclick="switchTab('pedido')">
+      <span class="tab-icon">📦</span><span>Pedido</span>
+    </button>
+    <button class="tab-btn" id="tab-cliente" onclick="switchTab('cliente')">
+      <span class="tab-icon">👤</span><span>Cliente</span>
+    </button>
+  </nav>
+
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="modalSettings">
+  <div class="modal">
+    <div class="modal-title">⚙️ Configuración</div>
+    <div class="modal-sub">Ingresa tu Google Sheets API Key. Se guarda solo en memoria durante esta sesión.</div>
+    <div class="modal-status" id="modalStatusBox">
+      <span id="modalStatusIcon">🔴</span>
+      <span id="modalStatusText">Sin API Key configurada</span>
+    </div>
+    <div class="field">
+      <label for="apiKeyInput">API Key</label>
+      <input type="text" id="apiKeyInput" placeholder="AIza..." autocomplete="off" spellcheck="false">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-primary" onclick="saveApiKey()">Guardar y cargar datos</button>
+      <button class="btn-modal-secondary" id="btnReloadCatalog" onclick="reloadCatalog()" style="display:none;">🔄 Recargar catálogo</button>
+      <button class="btn-modal-close" onclick="closeSettings()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+const SHEET_ID = '1gH56b4yltH-85rTmEHQ8i61Hmsak2G0tSvTY0qOe59o';
+const BASE_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let apiKey = '';
+let catalogLoaded = false;
+let catalogLoading = false;
+let platos = [];    // [{nombre, categoria, precio}]
+let extras = [];    // [{nombre, precio}]
+let clientes = [];  // [string]
+let metodosPago = []; // [string]
+let platoCount = 1;
+let extraCount = 1;
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  setDefaultDateTime();
+});
+
+function setDefaultDateTime() {
+  // fecha and hora are now captured automatically at submit time
+}
+
+// ─── TAB SWITCHING ────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+
+// ─── SETTINGS MODAL ───────────────────────────────────────────────────────────
+function openSettings() {
+  document.getElementById('apiKeyInput').value = apiKey;
+  updateModalStatus();
+  document.getElementById('modalSettings').classList.add('show');
+}
+function closeSettings() {
+  document.getElementById('modalSettings').classList.remove('show');
+}
+function updateModalStatus() {
+  const icon = document.getElementById('modalStatusIcon');
+  const text = document.getElementById('modalStatusText');
+  const headerStatus = document.getElementById('headerStatus');
+  const reloadBtn = document.getElementById('btnReloadCatalog');
+  if (catalogLoading) {
+    icon.textContent = '🟡'; text.textContent = 'Cargando catálogo...';
+    headerStatus.textContent = '🟡 Cargando...';
+  } else if (catalogLoaded) {
+    icon.textContent = '🟢'; text.textContent = 'Catálogo cargado correctamente';
+    headerStatus.textContent = '🟢 Listo';
+    reloadBtn.style.display = 'block';
+  } else {
+    icon.textContent = '🔴';
+    text.textContent = apiKey ? 'Error al cargar catálogo' : 'Sin API Key configurada';
+    headerStatus.textContent = apiKey ? '🔴 Error' : '🔴 Sin API Key';
+    reloadBtn.style.display = apiKey ? 'block' : 'none';
+  }
+}
+function saveApiKey() {
+  const val = document.getElementById('apiKeyInput').value.trim();
+  if (!val) { alert('Por favor ingresa una API Key válida.'); return; }
+  apiKey = val;
+  closeSettings();
+  loadCatalog();
+}
+function reloadCatalog() {
+  closeSettings();
+  loadCatalog();
+}
+
+// ─── API HELPERS ──────────────────────────────────────────────────────────────
+async function sheetsGet(range) {
+  const url = `${BASE_URL}/${SHEET_ID}/values/${encodeURIComponent(range)}?key=${apiKey}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+async function sheetsGetValues(range) {
+  const data = await sheetsGet(range);
+  return data.values || [];
+}
+
+async function sheetsAppend(range, values) {
+  const url = `${BASE_URL}/${SHEET_ID}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS&key=${apiKey}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+async function sheetsUpdate(range, values) {
+  const url = `${BASE_URL}/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED&key=${apiKey}`;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// ─── CATALOG LOADING ──────────────────────────────────────────────────────────
+async function loadCatalog() {
+  if (!apiKey) return;
+  catalogLoading = true;
+  catalogLoaded = false;
+  updateModalStatus();
+
+  const overlay = document.getElementById('loadingOverlay');
+  overlay.classList.add('show');
+  document.getElementById('panel-pedido').style.display = 'none';
+  document.getElementById('panel-cliente').style.display = 'none';
+
+  try {
+    const [platosData, extrasData, clientesData, configData] = await Promise.all([
+      sheetsGetValues('BASE_PLATOS!B2:D50'),
+      sheetsGetValues('BASE_EXTRAS!B2:C50'),
+      sheetsGetValues('CLIENTES!B2:B100'),
+      sheetsGetValues('CONFIG!B5:B7'),
+    ]);
+
+    platos = platosData
+      .filter(r => r[0] && r[0].trim())
+      .map(r => ({
+        nombre: r[0].trim(),
+        categoria: (r[1] || 'General').trim(),
+        precio: parseFloat((r[2] || '0').replace(',', '.')) || 0
+      }));
+
+    extras = extrasData
+      .filter(r => r[0] && r[0].trim())
+      .map(r => ({
+        nombre: r[0].trim(),
+        precio: parseFloat((r[1] || '0').replace(',', '.')) || 0
+      }));
+
+    clientes = clientesData
+      .filter(r => r[0] && r[0].trim())
+      .map(r => r[0].trim());
+
+    metodosPago = configData
+      .filter(r => r[0] && r[0].trim())
+      .map(r => r[0].trim());
+
+    populateDropdowns();
+    catalogLoaded = true;
+    catalogLoading = false;
+    updateModalStatus();
+
+    overlay.classList.remove('show');
+    document.getElementById('panel-pedido').style.display = '';
+    document.getElementById('panel-cliente').style.display = '';
+
+  } catch(e) {
+    catalogLoading = false;
+    catalogLoaded = false;
+    updateModalStatus();
+    overlay.innerHTML = `
+      <div style="color:var(--red);font-size:15px;text-align:center;padding:20px;">
+        <div style="font-size:40px;margin-bottom:12px;">❌</div>
+        <strong>Error al cargar catálogo</strong><br>
+        <span style="font-size:13px;color:#888;margin-top:6px;display:block;">${e.message}</span>
+        <button class="btn-retry" onclick="retryLoad()">Reintentar</button>
+      </div>`;
+    overlay.classList.add('show');
+    document.getElementById('panel-pedido').style.display = 'none';
+    document.getElementById('panel-cliente').style.display = 'none';
+  }
+}
+
+function retryLoad() {
+  const overlay = document.getElementById('loadingOverlay');
+  overlay.innerHTML = `<div class="loading-spinner-lg"></div><p class="loading-text">Cargando catálogo...</p>`;
+  loadCatalog();
+}
+
+// ─── POPULATE DROPDOWNS ───────────────────────────────────────────────────────
+function buildPlatoOptions() {
+  // Group by categoria
+  const cats = {};
+  platos.forEach(p => {
+    if (!cats[p.categoria]) cats[p.categoria] = [];
+    cats[p.categoria].push(p);
+  });
+  let html = '<option value="">— Selecciona plato —</option>';
+  Object.keys(cats).forEach(cat => {
+    html += `<optgroup label="${cat}">`;
+    cats[cat].forEach(p => {
+      const price = p.precio > 0 ? ` ($${p.precio.toFixed(2)})` : '';
+      html += `<option value="${p.nombre}" data-precio="${p.precio}">${p.nombre}${price}</option>`;
+    });
+    html += '</optgroup>';
+  });
+  return html;
+}
+
+function buildExtraOptions() {
+  let html = '<option value="">— Sin extra —</option>';
+  extras.forEach(e => {
+    const price = e.precio > 0 ? ` ($${e.precio.toFixed(2)})` : '';
+    html += `<option value="${e.nombre}" data-precio="${e.precio}">${e.nombre}${price}</option>`;
+  });
+  return html;
+}
+
+function populateDropdowns() {
+  // Métodos de pago (still a select — short list)
+  const pagoSel = document.getElementById('metodoPago');
+  pagoSel.innerHTML = '<option value="">— Selecciona —</option>';
+  metodosPago.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m; opt.textContent = m;
+    pagoSel.appendChild(opt);
+  });
+
+  // Init autocompletes
+  acInit('cliente', clientes.map(c => ({ label: c, value: c })));
+  ['plato1','plato2','plato3'].forEach(id => {
+    acInit(id, platos.map(p => ({
+      label: p.nombre + (p.precio > 0 ? ` — $${p.precio.toFixed(2)}` : ''),
+      value: p.nombre
+    })));
+  });
+  ['extra1','extra2','extra3'].forEach(id => {
+    acInit(id, extras.map(e => ({
+      label: e.nombre + (e.precio > 0 ? ` — $${e.precio.toFixed(2)}` : ''),
+      value: e.nombre
+    })));
+  });
+
+  recalcTotal();
+}
+
+// ─── PLATO/EXTRA ADD/REMOVE ───────────────────────────────────────────────────
+function addPlato() {
+  if (platoCount >= 3) return;
+  platoCount++;
+  document.getElementById(`platoRow${platoCount}`).classList.add('show');
+  if (platoCount === 3) document.getElementById('btnAddPlato').style.display = 'none';
+}
+function removePlato(n) {
+  document.getElementById(`plato${n}`).value = '';
+  document.getElementById(`cantPlato${n}`).value = 1;
+  document.getElementById(`platoRow${n}`).classList.remove('show');
+  platoCount = n - 1;
+  document.getElementById('btnAddPlato').style.display = '';
+  recalcTotal();
+}
+function addExtra() {
+  if (extraCount >= 3) return;
+  extraCount++;
+  document.getElementById(`extraRow${extraCount}`).classList.add('show');
+  if (extraCount === 3) document.getElementById('btnAddExtra').style.display = 'none';
+}
+function removeExtra(n) {
+  document.getElementById(`extra${n}`).value = '';
+  document.getElementById(`cantExtra${n}`).value = 1;
+  document.getElementById(`extraRow${n}`).classList.remove('show');
+  extraCount = n - 1;
+  document.getElementById('btnAddExtra').style.display = '';
+  recalcTotal();
+}
+
+// ─── TOTAL CALCULATION ────────────────────────────────────────────────────────
+function getPrecioPlato(nombre) {
+  const p = platos.find(x => x.nombre === nombre);
+  return p ? p.precio : 0;
+}
+function getPrecioExtra(nombre) {
+  const e = extras.find(x => x.nombre === nombre);
+  return e ? e.precio : 0;
+}
+function fmt(n) { return '$' + n.toFixed(2); }
+
+function recalcTotal() {
+  let subPlatos = 0, subExtras = 0;
+
+  [1, 2, 3].forEach(i => {
+    const nombre = document.getElementById(`plato${i}`).value;
+    const cant = parseInt(document.getElementById(`cantPlato${i}`).value) || 1;
+    if (nombre) subPlatos += getPrecioPlato(nombre) * cant;
+  });
+
+  [1, 2, 3].forEach(i => {
+    const nombre = document.getElementById(`extra${i}`).value;
+    const cant = parseInt(document.getElementById(`cantExtra${i}`).value) || 1;
+    if (nombre) subExtras += getPrecioExtra(nombre) * cant;
+  });
+
+  const descuento = parseFloat(document.getElementById('descuento').value) || 0;
+  const propina = parseFloat(document.getElementById('propina').value) || 0;
+  const total = subPlatos + subExtras - descuento + propina;
+
+  document.getElementById('tSubPlatos').textContent = fmt(subPlatos);
+  document.getElementById('tSubExtras').textContent = fmt(subExtras);
+  document.getElementById('tDescuento').textContent = '-' + fmt(descuento);
+  document.getElementById('tPropina').textContent = '+' + fmt(propina);
+  document.getElementById('tTotal').textContent = fmt(Math.max(0, total));
+}
+
+// ─── SHOW MESSAGE ─────────────────────────────────────────────────────────────
+function showMsg(id, type, text) {
+  const el = document.getElementById(id);
+  el.className = `msg ${type} show`;
+  el.textContent = text;
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  if (type === 'success') setTimeout(() => el.classList.remove('show'), 5000);
+}
+function hideMsg(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+// ─── SUBMIT PEDIDO ────────────────────────────────────────────────────────────
+async function submitPedido() {
+  if (!apiKey) { alert('Configura tu API Key primero (⚙️)'); return; }
+  if (!catalogLoaded) { alert('Espera a que cargue el catálogo.'); return; }
+
+  hideMsg('msgPedido');
+
+  // Validations
+  const cliente = document.getElementById('cliente').value;
+  const plato1 = document.getElementById('plato1').value;
+  const metodoPago = document.getElementById('metodoPago').value;
+
+  if (!cliente) { showMsg('msgPedido', 'error', '⚠️ Selecciona un cliente.'); return; }
+  if (!plato1) { showMsg('msgPedido', 'error', '⚠️ Selecciona al menos el Plato 1.'); return; }
+  if (!metodoPago) { showMsg('msgPedido', 'error', '⚠️ Selecciona un método de pago.'); return; }
+
+  // Auto-capture fecha and hora at submit time
+  const now = new Date();
+  const fecha = now.toISOString().slice(0,10);
+  const hora = now.toTimeString().slice(0,5);
+
+  // Set loading state
+  const btn = document.getElementById('btnSubmitPedido');
+  const spinner = document.getElementById('spinnerPedido');
+  const btnText = document.getElementById('btnPedidoText');
+  btn.disabled = true;
+  spinner.classList.add('visible');
+  btnText.textContent = 'Registrando...';
+
+  try {
+    // Get next ID
+    const existingIds = await sheetsGetValues('PEDIDOS!A2:A1001');
+    const nextNum = existingIds.filter(r => r[0] && r[0].trim()).length + 1;
+    const newId = String(nextNum).padStart(3, '0');
+
+    // Format fecha DD/MM/YYYY
+    const [y, m, d] = fecha.split('-');
+    const fechaFmt = `${d}/${m}/${y}`;
+
+    // Collect values
+    const p2 = document.getElementById('plato2').value;
+    const p3 = document.getElementById('plato3').value;
+    const c1 = document.getElementById('cantPlato1').value || 1;
+    const c2 = document.getElementById('cantPlato2').value || 1;
+    const c3 = document.getElementById('cantPlato3').value || 1;
+
+    const e1 = document.getElementById('extra1').value;
+    const e2 = document.getElementById('extra2').value;
+    const e3 = document.getElementById('extra3').value;
+    const ce1 = document.getElementById('cantExtra1').value || 1;
+    const ce2 = document.getElementById('cantExtra2').value || 1;
+    const ce3 = document.getElementById('cantExtra3').value || 1;
+
+    const estado = document.getElementById('estado').value;
+    const notas = document.getElementById('notas').value;
+    const direccion = document.getElementById('direccion').value;
+    const descuento = document.getElementById('descuento').value || 0;
+    const propina = document.getElementById('propina').value || 0;
+    const timestamp = new Date().toISOString();
+
+    // Build row: A(1) B(2) C(3) D(4) E(5) F(6) G(7) H(8) I(9) J(10)
+    // K(11) L(12) M(13) N(14) O(15) P(16) Q-Y(17-25 empty) Z(26) AA(27) AB(28) AC(29) AD(30) AE(31) AF(32)
+    const row = [
+      newId,       // A - ID
+      fechaFmt,    // B - Fecha
+      hora,        // C - Hora
+      cliente,     // D - Cliente
+      plato1,      // E - Plato 1
+      c1,          // F - Cant.1
+      p2 || '',    // G - Plato 2
+      p2 ? c2 : '', // H - Cant.2
+      p3 || '',    // I - Plato 3
+      p3 ? c3 : '', // J - Cant.3
+      e1 || '',    // K - Extra 1
+      e1 ? ce1 : '', // L - Cant.E1
+      e2 || '',    // M - Extra 2
+      e2 ? ce2 : '', // N - Cant.E2
+      e3 || '',    // O - Extra 3
+      e3 ? ce3 : '', // P - Cant.E3
+      '', '', '', '', '', '', '', '', '', // Q-Y (fórmulas del sheet)
+      metodoPago,  // Z - Pago
+      estado,      // AA - Estado
+      notas,       // AB - Notas
+      timestamp,   // AC - Timestamp
+      direccion,   // AD - Dirección
+      descuento,   // AE - Descuento
+      propina      // AF - Propina
+    ];
+
+    await sheetsAppend('PEDIDOS!A:AF', [row]);
+
+    // Calculate total for confirmation message
+    const totalEl = document.getElementById('tTotal').textContent;
+    showMsg('msgPedido', 'success', `✅ Pedido #${newId} registrado — Total: ${totalEl}`);
+    resetPedidoForm();
+
+  } catch(e) {
+    showMsg('msgPedido', 'error', `❌ Error al registrar: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    spinner.classList.remove('visible');
+    btnText.textContent = 'Registrar pedido';
+  }
+}
+
+function resetPedidoForm() {
+  acClear('cliente');
+  [1, 2, 3].forEach(i => {
+    acClear(`plato${i}`);
+    document.getElementById(`cantPlato${i}`).value = 1;
+    acClear(`extra${i}`);
+    document.getElementById(`cantExtra${i}`).value = 1;
+  });
+  // Collapse extra platos/extras
+  [2, 3].forEach(i => {
+    document.getElementById(`platoRow${i}`).classList.remove('show');
+    document.getElementById(`extraRow${i}`).classList.remove('show');
+  });
+  platoCount = 1;
+  extraCount = 1;
+  document.getElementById('btnAddPlato').style.display = '';
+  document.getElementById('btnAddExtra').style.display = '';
+  document.getElementById('metodoPago').value = '';
+  document.getElementById('estado').value = 'Pendiente';
+  document.getElementById('notas').value = '';
+  document.getElementById('direccion').value = '';
+  document.getElementById('descuento').value = 0;
+  document.getElementById('propina').value = 0;
+  recalcTotal();
+}
+
+// ─── SUBMIT CLIENTE ───────────────────────────────────────────────────────────
+async function submitCliente() {
+  if (!apiKey) { alert('Configura tu API Key primero (⚙️)'); return; }
+
+  hideMsg('msgCliente');
+
+  const nombre = document.getElementById('cliNombre').value.trim();
+  const tel = document.getElementById('cliTel').value.trim();
+  const dir = document.getElementById('cliDir').value.trim();
+
+  if (!nombre) { showMsg('msgCliente', 'error', '⚠️ El nombre es obligatorio.'); return; }
+
+  // Check duplicate (case-insensitive)
+  const existe = clientes.find(c => c.toLowerCase() === nombre.toLowerCase());
+  if (existe) {
+    showMsg('msgCliente', 'warning', `⚠️ Ya existe un cliente con ese nombre: "${existe}". ¿Deseas continuar de todas formas?`);
+    // Allow continuing — user must press button again to confirm
+    // On second press (message already showing), proceed
+    const msg = document.getElementById('msgCliente');
+    if (!msg.dataset.warned) { msg.dataset.warned = '1'; return; }
+    delete msg.dataset.warned;
+  }
+
+  const btn = document.getElementById('btnSubmitCliente');
+  const spinner = document.getElementById('spinnerCliente');
+  const btnText = document.getElementById('btnClienteText');
+  btn.disabled = true;
+  spinner.classList.add('visible');
+  btnText.textContent = 'Registrando...';
+
+  try {
+    // Write only col B (nombre) — other cols are formulas in the sheet
+    await sheetsAppend('CLIENTES!B:B', [[nombre]]);
+
+    // Update local list and AC data
+    clientes.push(nombre);
+    acData['cliente'].push({ label: nombre, value: nombre });
+
+    showMsg('msgCliente', 'success', `✅ Cliente "${nombre}" registrado. Ya puedes seleccionarlo en el pedido.`);
+    document.getElementById('cliNombre').value = '';
+    document.getElementById('cliTel').value = '';
+    document.getElementById('cliDir').value = '';
+
+  } catch(e) {
+    showMsg('msgCliente', 'error', `❌ Error al registrar: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    spinner.classList.remove('visible');
+    btnText.textContent = 'Registrar cliente';
+  }
+}
+
+// ─── AUTOCOMPLETE ENGINE ──────────────────────────────────────────────────────
+const acData = {};       // id -> [{label, value}]
+const acSelected = {};   // id -> value
+let acActiveIndex = {};  // id -> highlighted index
+
+function acInit(id, items) {
+  acData[id] = items;
+  acSelected[id] = '';
+  acActiveIndex[id] = -1;
+}
+
+function acFilter(id) {
+  const input = document.getElementById(`acInput-${id}`);
+  const query = input.value.toLowerCase().trim();
+  const drop = document.getElementById(`acDrop-${id}`);
+  const clearBtn = document.getElementById(`acClear-${id}`);
+
+  // Clear hidden value if user is typing again
+  document.getElementById(id).value = '';
+  acSelected[id] = '';
+  input.classList.remove('has-value');
+  clearBtn.classList.toggle('visible', input.value.length > 0);
+
+  if (!query) { acClose(id); return; }
+
+  const items = (acData[id] || []).filter(item =>
+    item.label.toLowerCase().includes(query)
+  );
+
+  if (items.length === 0) {
+    drop.innerHTML = `<div class="ac-empty">Sin resultados</div>`;
+  } else {
+    drop.innerHTML = items.map((item, i) => {
+      const highlighted = item.label.replace(
+        new RegExp(`(${query.replace(/[.*+?^${}()|[\]\]/g,'\$&')})`, 'gi'),
+        '<em>$1</em>'
+      );
+      return `<div class="ac-option" data-value="${item.value}" data-index="${i}" onmousedown="acSelect('${id}','${item.value.replace(/'/g,"\'")}','${item.label.replace(/'/g,"\'")}')">${highlighted}</div>`;
+    }).join('');
+  }
+
+  acActiveIndex[id] = -1;
+  drop.classList.add('open');
+}
+
+function acOpen(id) {
+  const input = document.getElementById(`acInput-${id}`);
+  const drop = document.getElementById(`acDrop-${id}`);
+  const query = input.value.toLowerCase().trim();
+  if (!query) {
+    // Show all options on focus if empty
+    const items = acData[id] || [];
+    if (items.length > 0) {
+      drop.innerHTML = items.map(item =>
+        `<div class="ac-option" data-value="${item.value}" onmousedown="acSelect('${id}','${item.value.replace(/'/g,"\'")}','${item.label.replace(/'/g,"\'")}')">${item.label}</div>`
+      ).join('');
+      drop.classList.add('open');
+    }
+  }
+}
+
+function acSelect(id, value, label) {
+  document.getElementById(`acInput-${id}`).value = label;
+  document.getElementById(`acInput-${id}`).classList.add('has-value');
+  document.getElementById(id).value = value;
+  document.getElementById(`acClear-${id}`).classList.add('visible');
+  acSelected[id] = value;
+  acClose(id);
+  recalcTotal();
+}
+
+function acClear(id) {
+  document.getElementById(`acInput-${id}`).value = '';
+  document.getElementById(`acInput-${id}`).classList.remove('has-value');
+  document.getElementById(id).value = '';
+  document.getElementById(`acClear-${id}`).classList.remove('visible');
+  acSelected[id] = '';
+  acClose(id);
+  recalcTotal();
+}
+
+function acClose(id) {
+  document.getElementById(`acDrop-${id}`).classList.remove('open');
+  acActiveIndex[id] = -1;
+}
+
+function acKey(e, id) {
+  const drop = document.getElementById(`acDrop-${id}`);
+  const options = drop.querySelectorAll('.ac-option');
+  if (!drop.classList.contains('open') || options.length === 0) return;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    acActiveIndex[id] = Math.min(acActiveIndex[id] + 1, options.length - 1);
+    options.forEach((o,i) => o.classList.toggle('highlighted', i === acActiveIndex[id]));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    acActiveIndex[id] = Math.max(acActiveIndex[id] - 1, 0);
+    options.forEach((o,i) => o.classList.toggle('highlighted', i === acActiveIndex[id]));
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (acActiveIndex[id] >= 0) options[acActiveIndex[id]].dispatchEvent(new MouseEvent('mousedown'));
+  } else if (e.key === 'Escape') {
+    acClose(id);
+  }
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', e => {
+  ['cliente','plato1','plato2','plato3','extra1','extra2','extra3'].forEach(id => {
+    const wrap = document.getElementById(`acWrap-${id}`);
+    if (wrap && !wrap.contains(e.target)) acClose(id);
+  });
+});
+</script>
+</body>
+</html>
