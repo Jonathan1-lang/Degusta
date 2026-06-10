@@ -321,7 +321,7 @@
   <header class="header">
     <div style="display:flex;align-items:center;gap:8px;">
       <span class="header-title">🍽️ Degusta</span>
-      <span class="header-status" id="headerStatus">🔴 Sin API Key</span>
+      <span class="header-status" id="headerStatus">🔴 Sin configurar</span>
     </div>
     <button class="btn-settings" onclick="openSettings()">⚙️</button>
   </header>
@@ -339,9 +339,9 @@
     <div class="tab-panel active" id="panel-pedido">
       <div id="msgPedido" class="msg"></div>
       <div id="apiBanner" style="background:#FFF3E0;border:2px solid var(--orange);border-radius:12px;padding:16px;margin-bottom:14px;">
-        <div style="font-weight:700;font-size:15px;margin-bottom:4px;">⚙️ API Key de Google Sheets</div>
-        <div style="font-size:13px;color:#888;margin-bottom:10px;">Pega tu clave aquí para activar la app</div>
-        <input type="text" id="inlineApiKey" placeholder="AIza..." autocomplete="off" spellcheck="false"
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px;">⚙️ Web App URL</div>
+        <div style="font-size:13px;color:#888;margin-bottom:10px;">Pega la URL de la Web App del script para activar la app</div>
+        <input type="text" id="inlineApiKey" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off" spellcheck="false"
           style="width:100%;padding:12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:15px;margin-bottom:10px;background:white;">
         <button onclick="saveInlineApiKey()"
           style="background:var(--orange);color:white;border:none;border-radius:8px;padding:14px;font-size:16px;font-weight:700;cursor:pointer;width:100%;">
@@ -576,14 +576,14 @@
 <div class="modal-overlay" id="modalSettings">
   <div class="modal">
     <div class="modal-title">⚙️ Configuración</div>
-    <div class="modal-sub">Ingresa tu Google Sheets API Key. Se guarda solo en memoria durante esta sesión.</div>
+    <div class="modal-sub">Ingresa la URL de la Web App del script. Se guarda en el dispositivo.</div>
     <div class="modal-status" id="modalStatusBox">
       <span id="modalStatusIcon">🔴</span>
-      <span id="modalStatusText">Sin API Key configurada</span>
+      <span id="modalStatusText">Sin URL configurada</span>
     </div>
     <div class="field">
-      <label for="apiKeyInput">API Key</label>
-      <input type="text" id="apiKeyInput" placeholder="AIza..." autocomplete="off" spellcheck="false">
+      <label for="apiKeyInput">URL de la Web App</label>
+      <input type="text" id="apiKeyInput" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off" spellcheck="false">
     </div>
     <div class="modal-actions">
       <button class="btn-modal-primary" onclick="saveApiKey()">Guardar y cargar datos</button>
@@ -595,23 +595,30 @@
 
 <script>
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const SHEET_ID = '1gH56b4yltH-85rTmEHQ8i61Hmsak2G0tSvTY0qOe59o';
-const BASE_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
+const SHEET_ID  = '1gH56b4yltH-85rTmEHQ8i61Hmsak2G0tSvTY0qOe59o'; // solo para referencia
+// Web App URL — actualizar después de publicar el script como Web App
+// Implementar → Nueva implementación → Web App → Ejecutar como: Yo → Acceso: Todos
+let WEBAPP_URL  = localStorage.getItem('degusta_webapp_url') || '';
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
-let apiKey = '';
 let catalogLoaded = false;
 let catalogLoading = false;
-let platos = [];    // [{nombre, categoria, precio}]
-let extras = [];    // [{nombre, precio}]
-let clientes = [];  // [string]
-let metodosPago = []; // [string]
+let platos = [];
+let extras = [];
+let clientes = [];
+let metodosPago = [];
 let platoCount = 1;
 let extraCount = 1;
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   setDefaultDateTime();
+  // Auto-cargar catálogo si ya hay URL guardada
+  if (WEBAPP_URL) {
+    const banner = document.getElementById('apiBanner');
+    if (banner) banner.style.display = 'none';
+    loadCatalog();
+  }
 });
 
 function setDefaultDateTime() {
@@ -628,7 +635,7 @@ function switchTab(tab) {
 
 // ─── SETTINGS MODAL ───────────────────────────────────────────────────────────
 function openSettings() {
-  document.getElementById('apiKeyInput').value = apiKey;
+  document.getElementById('apiKeyInput').value = WEBAPP_URL;
   updateModalStatus();
   document.getElementById('modalSettings').classList.add('show');
 }
@@ -649,15 +656,16 @@ function updateModalStatus() {
     reloadBtn.style.display = 'block';
   } else {
     icon.textContent = '🔴';
-    text.textContent = apiKey ? 'Error al cargar catálogo' : 'Sin API Key configurada';
-    headerStatus.textContent = apiKey ? '🔴 Error' : '🔴 Sin API Key';
-    reloadBtn.style.display = apiKey ? 'block' : 'none';
+    text.textContent = WEBAPP_URL ? 'Error al cargar catálogo' : 'Sin URL de Web App configurada';
+    headerStatus.textContent = WEBAPP_URL ? '🔴 Error' : '🔴 Sin configurar';
+    reloadBtn.style.display = WEBAPP_URL ? 'block' : 'none';
   }
 }
 function saveApiKey() {
   const val = document.getElementById('apiKeyInput').value.trim();
-  if (!val) { alert('Por favor ingresa una API Key válida.'); return; }
-  apiKey = val;
+  if (!val) { alert('Por favor ingresa la URL de la Web App.'); return; }
+  WEBAPP_URL = val;
+  localStorage.setItem('degusta_webapp_url', val);
   closeSettings();
   loadCatalog();
 }
@@ -667,52 +675,32 @@ function reloadCatalog() {
 }
 
 // ─── API HELPERS ──────────────────────────────────────────────────────────────
-async function sheetsGet(range) {
-  const url = `${BASE_URL}/${SHEET_ID}/values/${encodeURIComponent(range)}?key=${apiKey}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `HTTP ${res.status}`);
-  }
-  return res.json();
+async function webappGet(params = {}) {
+  const url = new URL(WEBAPP_URL);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Error desconocido');
+  return data;
 }
 
-async function sheetsGetValues(range) {
-  const data = await sheetsGet(range);
-  return data.values || [];
-}
-
-async function sheetsAppend(range, values) {
-  const url = `${BASE_URL}/${SHEET_ID}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS&key=${apiKey}`;
-  const res = await fetch(url, {
+async function webappPost(action, data) {
+  const res = await fetch(WEBAPP_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values })
+    body: JSON.stringify({ action, data }),
+    redirect: 'follow'
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `HTTP ${res.status}`);
-  }
-  return res.json();
-}
-
-async function sheetsUpdate(range, values) {
-  const url = `${BASE_URL}/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED&key=${apiKey}`;
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values })
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `HTTP ${res.status}`);
-  }
-  return res.json();
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const result = await res.json();
+  if (!result.ok) throw new Error(result.error || 'Error desconocido');
+  return result;
 }
 
 // ─── CATALOG LOADING ──────────────────────────────────────────────────────────
 async function loadCatalog() {
-  if (!apiKey) return;
+  if (!WEBAPP_URL) return;
   catalogLoading = true;
   catalogLoaded = false;
   updateModalStatus();
@@ -723,35 +711,23 @@ async function loadCatalog() {
   document.getElementById('panel-cliente').style.display = 'none';
 
   try {
-    const [platosData, extrasData, clientesData, configData] = await Promise.all([
-      sheetsGetValues('BASE_PLATOS!B2:D50'),
-      sheetsGetValues('BASE_EXTRAS!B2:C50'),
-      sheetsGetValues('CLIENTES!B2:B100'),
-      sheetsGetValues('CONFIG!B5:B7'),
-    ]);
+    const catalogo = await webappGet({ action: 'catalogo' });
 
-    platos = platosData
-      .filter(r => r[0] && r[0].trim())
-      .map(r => ({
-        nombre: r[0].trim(),
-        categoria: (r[1] || 'General').trim(),
-        precio: parseFloat((r[2] || '0').replace(',', '.')) || 0
-      }));
+    platos = (catalogo.platos || []).map(p => ({
+      nombre: p.nombre,
+      categoria: p.categoria || 'General',
+      precio: parseFloat(p.precio) || 0
+    }));
 
-    extras = extrasData
-      .filter(r => r[0] && r[0].trim())
-      .map(r => ({
-        nombre: r[0].trim(),
-        precio: parseFloat((r[1] || '0').replace(',', '.')) || 0
-      }));
+    extras = (catalogo.extras || []).map(e => ({
+      nombre: e.nombre,
+      precio: parseFloat(e.precio) || 0
+    }));
 
-    clientes = clientesData
-      .filter(r => r[0] && r[0].trim())
-      .map(r => r[0].trim());
+    clientes = (catalogo.clientes || []).filter(c => c && c.trim());
 
-    metodosPago = configData
-      .filter(r => r[0] && r[0].trim())
-      .map(r => r[0].trim());
+    metodosPago = (catalogo.metodos || ['Efectivo', 'Transferencia', 'Pendiente'])
+      .filter(m => m && m.trim());
 
     populateDropdowns();
     catalogLoaded = true;
@@ -925,27 +901,20 @@ function hideMsg(id) {
 
 // ─── SUBMIT PEDIDO ────────────────────────────────────────────────────────────
 async function submitPedido() {
-  if (!apiKey) { alert('Configura tu API Key primero (⚙️)'); return; }
+  if (!WEBAPP_URL) { alert('Configura la URL de la Web App primero (⚙️)'); return; }
   if (!catalogLoaded) { alert('Espera a que cargue el catálogo.'); return; }
 
   hideMsg('msgPedido');
 
-  // Validations
-  const cliente = document.getElementById('cliente').value;
-  const plato1 = document.getElementById('plato1').value;
+  const cliente    = document.getElementById('cliente').value;
+  const plato1     = document.getElementById('plato1').value;
   const metodoPago = document.getElementById('metodoPago').value;
 
-  if (!cliente) { showMsg('msgPedido', 'error', '⚠️ Selecciona un cliente.'); return; }
-  if (!plato1) { showMsg('msgPedido', 'error', '⚠️ Selecciona al menos el Plato 1.'); return; }
+  if (!cliente)    { showMsg('msgPedido', 'error', '⚠️ Selecciona un cliente.'); return; }
+  if (!plato1)     { showMsg('msgPedido', 'error', '⚠️ Selecciona al menos el Plato 1.'); return; }
   if (!metodoPago) { showMsg('msgPedido', 'error', '⚠️ Selecciona un método de pago.'); return; }
 
-  // Auto-capture fecha and hora at submit time
-  const now = new Date();
-  const fecha = now.toISOString().slice(0,10);
-  const hora = now.toTimeString().slice(0,5);
-
-  // Set loading state
-  const btn = document.getElementById('btnSubmitPedido');
+  const btn     = document.getElementById('btnSubmitPedido');
   const spinner = document.getElementById('spinnerPedido');
   const btnText = document.getElementById('btnPedidoText');
   btn.disabled = true;
@@ -953,70 +922,36 @@ async function submitPedido() {
   btnText.textContent = 'Registrando...';
 
   try {
-    // Get next ID
-    const existingIds = await sheetsGetValues('PEDIDOS!A2:A1001');
-    const nextNum = existingIds.filter(r => r[0] && r[0].trim()).length + 1;
-    const newId = String(nextNum).padStart(3, '0');
-
-    // Format fecha DD/MM/YYYY
-    const [y, m, d] = fecha.split('-');
-    const fechaFmt = `${d}/${m}/${y}`;
-
-    // Collect values
     const p2 = document.getElementById('plato2').value;
     const p3 = document.getElementById('plato3').value;
-    const c1 = document.getElementById('cantPlato1').value || 1;
-    const c2 = document.getElementById('cantPlato2').value || 1;
-    const c3 = document.getElementById('cantPlato3').value || 1;
-
     const e1 = document.getElementById('extra1').value;
     const e2 = document.getElementById('extra2').value;
     const e3 = document.getElementById('extra3').value;
-    const ce1 = document.getElementById('cantExtra1').value || 1;
-    const ce2 = document.getElementById('cantExtra2').value || 1;
-    const ce3 = document.getElementById('cantExtra3').value || 1;
 
-    const estado = document.getElementById('estado').value;
-    const notas = document.getElementById('notas').value;
-    const direccion = document.getElementById('direccion').value;
-    const descuento = document.getElementById('descuento').value || 0;
-    const propina = document.getElementById('propina').value || 0;
-    const timestamp = new Date().toISOString();
+    const result = await webappPost('pedido', {
+      cliente,
+      plato1,
+      cant1:     document.getElementById('cantPlato1').value || 1,
+      plato2:    p2 || '',
+      cant2:     p2 ? (document.getElementById('cantPlato2').value || 1) : '',
+      plato3:    p3 || '',
+      cant3:     p3 ? (document.getElementById('cantPlato3').value || 1) : '',
+      extra1:    e1 || '',
+      cantE1:    e1 ? (document.getElementById('cantExtra1').value || 1) : '',
+      extra2:    e2 || '',
+      cantE2:    e2 ? (document.getElementById('cantExtra2').value || 1) : '',
+      extra3:    e3 || '',
+      cantE3:    e3 ? (document.getElementById('cantExtra3').value || 1) : '',
+      pago:      metodoPago,
+      estado:    document.getElementById('estado').value || 'Pendiente',
+      notas:     document.getElementById('notas').value || '',
+      direccion: document.getElementById('direccion').value || '',
+      descuento: document.getElementById('descuento').value || 0,
+      propina:   document.getElementById('propina').value || 0,
+    });
 
-    // Build row: A(1) B(2) C(3) D(4) E(5) F(6) G(7) H(8) I(9) J(10)
-    // K(11) L(12) M(13) N(14) O(15) P(16) Q-Y(17-25 empty) Z(26) AA(27) AB(28) AC(29) AD(30) AE(31) AF(32)
-    const row = [
-      newId,       // A - ID
-      fechaFmt,    // B - Fecha
-      hora,        // C - Hora
-      cliente,     // D - Cliente
-      plato1,      // E - Plato 1
-      c1,          // F - Cant.1
-      p2 || '',    // G - Plato 2
-      p2 ? c2 : '', // H - Cant.2
-      p3 || '',    // I - Plato 3
-      p3 ? c3 : '', // J - Cant.3
-      e1 || '',    // K - Extra 1
-      e1 ? ce1 : '', // L - Cant.E1
-      e2 || '',    // M - Extra 2
-      e2 ? ce2 : '', // N - Cant.E2
-      e3 || '',    // O - Extra 3
-      e3 ? ce3 : '', // P - Cant.E3
-      '', '', '', '', '', '', '', '', '', // Q-Y (fórmulas del sheet)
-      metodoPago,  // Z - Pago
-      estado,      // AA - Estado
-      notas,       // AB - Notas
-      timestamp,   // AC - Timestamp
-      direccion,   // AD - Dirección
-      descuento,   // AE - Descuento
-      propina      // AF - Propina
-    ];
-
-    await sheetsAppend('PEDIDOS!A:AF', [row]);
-
-    // Calculate total for confirmation message
     const totalEl = document.getElementById('tTotal').textContent;
-    showMsg('msgPedido', 'success', `✅ Pedido #${newId} registrado — Total: ${totalEl}`);
+    showMsg('msgPedido', 'success', `✅ Pedido #${result.id} registrado — Total: ${totalEl}`);
     resetPedidoForm();
 
   } catch(e) {
@@ -1056,28 +991,26 @@ function resetPedidoForm() {
 
 // ─── SUBMIT CLIENTE ───────────────────────────────────────────────────────────
 async function submitCliente() {
-  if (!apiKey) { alert('Configura tu API Key primero (⚙️)'); return; }
+  if (!WEBAPP_URL) { alert('Configura la URL de la Web App primero (⚙️)'); return; }
 
   hideMsg('msgCliente');
 
   const nombre = document.getElementById('cliNombre').value.trim();
-  const tel = document.getElementById('cliTel').value.trim();
-  const dir = document.getElementById('cliDir').value.trim();
+  const tel    = document.getElementById('cliTel').value.trim();
+  const dir    = document.getElementById('cliDir').value.trim();
 
   if (!nombre) { showMsg('msgCliente', 'error', '⚠️ El nombre es obligatorio.'); return; }
 
   // Check duplicate (case-insensitive)
   const existe = clientes.find(c => c.toLowerCase() === nombre.toLowerCase());
   if (existe) {
-    showMsg('msgCliente', 'warning', `⚠️ Ya existe un cliente con ese nombre: "${existe}". ¿Deseas continuar de todas formas?`);
-    // Allow continuing — user must press button again to confirm
-    // On second press (message already showing), proceed
     const msg = document.getElementById('msgCliente');
+    showMsg('msgCliente', 'warning', `⚠️ Ya existe un cliente con ese nombre: "${existe}". ¿Deseas continuar de todas formas?`);
     if (!msg.dataset.warned) { msg.dataset.warned = '1'; return; }
     delete msg.dataset.warned;
   }
 
-  const btn = document.getElementById('btnSubmitCliente');
+  const btn     = document.getElementById('btnSubmitCliente');
   const spinner = document.getElementById('spinnerCliente');
   const btnText = document.getElementById('btnClienteText');
   btn.disabled = true;
@@ -1085,17 +1018,15 @@ async function submitCliente() {
   btnText.textContent = 'Registrando...';
 
   try {
-    // Write only col B (nombre) — other cols are formulas in the sheet
-    await sheetsAppend('CLIENTES!B:B', [[nombre]]);
+    const result = await webappPost('cliente', { nombre, telefono: tel, direccion: dir });
 
-    // Update local list and AC data
     clientes.push(nombre);
     acData['cliente'].push({ label: nombre, value: nombre });
 
-    showMsg('msgCliente', 'success', `✅ Cliente "${nombre}" registrado. Ya puedes seleccionarlo en el pedido.`);
+    showMsg('msgCliente', 'success', `✅ Cliente "${nombre}" registrado (${result.id}). Ya puedes seleccionarlo en el pedido.`);
     document.getElementById('cliNombre').value = '';
-    document.getElementById('cliTel').value = '';
-    document.getElementById('cliDir').value = '';
+    document.getElementById('cliTel').value   = '';
+    document.getElementById('cliDir').value   = '';
 
   } catch(e) {
     showMsg('msgCliente', 'error', `❌ Error al registrar: ${e.message}`);
@@ -1111,12 +1042,13 @@ function saveInlineApiKey() {
   const val = document.getElementById('inlineApiKey').value.trim();
   const msg = document.getElementById('inlineBannerMsg');
   if (!val) {
-    msg.textContent = '⚠️ Por favor ingresa una API Key válida.';
+    msg.textContent = '⚠️ Por favor ingresa la URL de la Web App.';
     msg.style.display = 'block';
     return;
   }
   msg.style.display = 'none';
-  apiKey = val;
+  WEBAPP_URL = val;
+  localStorage.setItem('degusta_webapp_url', val);
   document.getElementById('apiKeyInput').value = val;
   loadCatalog();
 }
