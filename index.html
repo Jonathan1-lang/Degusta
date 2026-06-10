@@ -8,6 +8,11 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+  /* Remove 300ms tap delay on Android Chrome */
+  a, button, input, select, textarea, [onclick], [ontouchend] {
+    touch-action: manipulation;
+  }
+
   :root {
     --orange: #FF6B00;
     --orange-dark: #E55A00;
@@ -1150,10 +1155,12 @@ function acFilter(id) {
   } else {
     drop.innerHTML = items.map((item, i) => {
       const highlighted = item.label.replace(
-        new RegExp(`(${query.replace(/[.*+?^${}()|[\]\]/g,'\$&')})`, 'gi'),
+        new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'),
         '<em>$1</em>'
       );
-      return `<div class="ac-option" data-value="${item.value}" data-index="${i}" onmousedown="acSelect('${id}','${item.value.replace(/'/g,"\'")}','${item.label.replace(/'/g,"\'")}')">${highlighted}</div>`;
+      const safeValue = item.value.replace(/'/g,"\\'");
+      const safeLabel = item.label.replace(/'/g,"\\'");
+      return `<div class="ac-option" data-value="${item.value}" data-index="${i}" onmousedown="acSelectHandler(event,'${id}','${safeValue}','${safeLabel}')" ontouchend="acSelectHandler(event,'${id}','${safeValue}','${safeLabel}')">${highlighted}</div>`;
     }).join('');
   }
 
@@ -1169,12 +1176,19 @@ function acOpen(id) {
     // Show all options on focus if empty
     const items = acData[id] || [];
     if (items.length > 0) {
-      drop.innerHTML = items.map(item =>
-        `<div class="ac-option" data-value="${item.value}" onmousedown="acSelect('${id}','${item.value.replace(/'/g,"\'")}','${item.label.replace(/'/g,"\'")}')">${item.label}</div>`
-      ).join('');
+      drop.innerHTML = items.map(item => {
+        const safeValue = item.value.replace(/'/g,"\\'");
+        const safeLabel = item.label.replace(/'/g,"\\'");
+        return `<div class="ac-option" data-value="${item.value}" onmousedown="acSelectHandler(event,'${id}','${safeValue}','${safeLabel}')" ontouchend="acSelectHandler(event,'${id}','${safeValue}','${safeLabel}')">${item.label}</div>`;
+      }).join('');
       drop.classList.add('open');
     }
   }
+}
+
+function acSelectHandler(e, id, value, label) {
+  e.preventDefault(); // Prevents blur from firing before selection on mobile
+  acSelect(id, value, label);
 }
 
 function acSelect(id, value, label) {
@@ -1217,19 +1231,27 @@ function acKey(e, id) {
     options.forEach((o,i) => o.classList.toggle('highlighted', i === acActiveIndex[id]));
   } else if (e.key === 'Enter') {
     e.preventDefault();
-    if (acActiveIndex[id] >= 0) options[acActiveIndex[id]].dispatchEvent(new MouseEvent('mousedown'));
+    if (acActiveIndex[id] >= 0) {
+      const opt = options[acActiveIndex[id]];
+      const value = opt.dataset.value;
+      // Find label from acData
+      const found = (acData[id] || []).find(x => x.value === value);
+      acSelect(id, value, found ? found.label : value);
+    }
   } else if (e.key === 'Escape') {
     acClose(id);
   }
 }
 
-// Close dropdowns when clicking outside
-document.addEventListener('click', e => {
+// Close dropdowns when clicking/tapping outside
+function closeDropdownsOutside(e) {
   ['cliente','plato1','plato2','plato3','extra1','extra2','extra3'].forEach(id => {
     const wrap = document.getElementById(`acWrap-${id}`);
     if (wrap && !wrap.contains(e.target)) acClose(id);
   });
-});
+}
+document.addEventListener('click', closeDropdownsOutside);
+document.addEventListener('touchstart', closeDropdownsOutside, { passive: true });
 </script>
 </body>
 </html>
