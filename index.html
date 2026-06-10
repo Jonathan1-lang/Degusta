@@ -1,1263 +1,686 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<title>Degusta</title>
-<style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+// ═══════════════════════════════════════════════════════════════
+// SISTEMA DE PEDIDOS — SCRIPT COMPLETO v7
+// Cambios respecto a v6:
+//   - doGet(): ahora maneja TAMBIÉN las escrituras (pedido, cliente).
+//     La app móvil enviaba POST desde github.io → bloqueado por CORS.
+//     Solución: todo via GET. La app envía action= y d= (JSON) como
+//     parámetros de URL. doGet detecta la acción y ejecuta la lógica.
+//   - doPost() se mantiene por compatibilidad pero ya no es necesario
+//     desde la app móvil.
+//   - Corrección de fila en doGet/pedido: las columnas Q–Y (fórmulas
+//     del sheet) NO se escriben — se usan setValues solo en las cols
+//     de datos (A–P, Z–AF) para no destruir las fórmulas existentes.
+//   - Todos los cambios de v6 se mantienen intactos.
+// ═══════════════════════════════════════════════════════════════
 
-/* Remove 300ms tap delay on Android Chrome */
-a, button, input, select, textarea, [onclick], [ontouchend] {
-  touch-action: manipulation;
+const HOJA_PEDIDOS  = "PEDIDOS";
+const HOJA_CLIENTES = "CLIENTES";
+const HOJA_PLATOS   = "BASE_PLATOS";
+const HOJA_EXTRAS   = "BASE_EXTRAS";
+const HOJA_CONFIG   = "CONFIG";
+
+const ZONA_HORARIA_DEFAULT = "America/El_Salvador";
+
+const COL_ID_PED    = 1;
+const COL_FECHA     = 2;
+const COL_HORA      = 3;
+const COL_CLIENTE   = 4;
+const COL_PLATO1    = 5;
+const COL_CANT1     = 6;
+const COL_PLATO2    = 7;
+const COL_CANT2     = 8;
+const COL_PLATO3    = 9;
+const COL_CANT3     = 10;
+const COL_EXTRA1    = 11;
+const COL_CANT_E1   = 12;
+const COL_EXTRA2    = 13;
+const COL_CANT_E2   = 14;
+const COL_EXTRA3    = 15;
+const COL_CANT_E3   = 16;
+const COL_PRECIO_P1 = 17;
+const COL_PRECIO_P2 = 18;
+const COL_PRECIO_P3 = 19;
+const COL_PRECIO_E1 = 20;
+const COL_PRECIO_E2 = 21;
+const COL_PRECIO_E3 = 22;
+// W=23 Subtotal, X=24 T.Extras, Y=25 TOTAL → fórmulas, no tocar
+const COL_PAGO      = 26;
+const COL_ESTADO    = 27;
+const COL_NOTAS     = 28;
+const COL_TIMESTAMP = 29;
+const COL_DIRECCION = 30;
+const COL_DESCUENTO = 31;
+const COL_PROPINA   = 32;
+
+const COL_ID_CLI       = 1;
+const COL_NOMBRE_CLI   = 2;
+const COL_TELEFONO_CLI = 3;
+const COL_DIR_CLI      = 4;
+
+const COL_NOMBRE_PLATO = 2;
+const COL_PRECIO_PLATO = 4;
+
+const COL_NOMBRE_EXTRA = 2;
+const COL_PRECIO_EXTRA = 3;
+
+const CACHE_TTL = 60;
+
+// ═══════════════════════════════════════════════════════════════
+// WEB APP — doGet (maneja catálogo + escrituras desde app móvil)
+// ═══════════════════════════════════════════════════════════════
+
+function doGet(e) {
+  try {
+    const action = (e && e.parameter && e.parameter.action) ? e.parameter.action : 'catalogo';
+    const ss     = SpreadsheetApp.getActiveSpreadsheet();
+
+    // ── CATÁLOGO ─────────────────────────────────────────────
+    if (action === 'catalogo') {
+      const platos  = getListaConPrecioYCategoria(ss, HOJA_PLATOS);
+      const extras  = getListaConPrecio(ss, HOJA_EXTRAS, COL_NOMBRE_EXTRA, COL_PRECIO_EXTRA);
+      const clientes = getListaDesdeHoja(ss, HOJA_CLIENTES, COL_NOMBRE_CLI);
+
+      const hojaConfig = ss.getSheetByName(HOJA_CONFIG);
+      const metodos = hojaConfig
+        ? hojaConfig.getRange('B5:B7').getValues().flat().filter(v => v !== '')
+        : ['Efectivo', 'Transferencia'];
+      const estados = hojaConfig
+        ? hojaConfig.getRange('B7:B11').getValues().flat().filter(v => v !== '')
+        : ['Pendiente', 'Preparando', 'En camino', 'Entregado', 'Cancelado'];
+
+      return jsonResponse({ ok: true, platos, extras, clientes, metodos, estados });
+    }
+
+    // ── REGISTRAR PEDIDO ─────────────────────────────────────
+    if (action === 'pedido') {
+      const data  = JSON.parse(e.parameter.d || '{}');
+      const sheet = ss.getSheetByName(HOJA_PEDIDOS);
+
+      // ID estático
+      const ultimaFila = sheet.getLastRow();
+      let maxId = 0;
+      if (ultimaFila >= 2) {
+        const ids = sheet.getRange(2, COL_ID_PED, ultimaFila - 1, 1).getValues().flat();
+        ids.forEach(id => {
+          const num = parseInt(id);
+          if (!isNaN(num) && num > maxId) maxId = num;
+        });
+      }
+      const newId = String(maxId + 1).padStart(3, '0');
+
+      // Fecha y hora
+      const zona     = leerZonaHoraria();
+      const ahora    = new Date();
+      const fechaStr = Utilities.formatDate(ahora, zona, 'MM/dd/yyyy');
+      const fechaObj = new Date(fechaStr);
+      const horaStr  = Utilities.formatDate(ahora, zona, 'HH:mm');
+
+      // Primera fila vacía
+      const colA = sheet.getRange(2, COL_ID_PED, sheet.getMaxRows() - 1, 1).getValues();
+      let filaDestino = -1;
+      for (let i = 0; i < colA.length; i++) {
+        if (colA[i][0] === '' || colA[i][0] === null) { filaDestino = i + 2; break; }
+      }
+      if (filaDestino === -1) filaDestino = ultimaFila + 1;
+
+      // Escribir columnas A–P (datos puros, sin tocar Q–Y que son fórmulas)
+      sheet.getRange(filaDestino, 1, 1, 16).setValues([[
+        newId,               // A  ID
+        fechaObj,            // B  Fecha
+        horaStr,             // C  Hora
+        data.cliente || '',  // D  Cliente
+        data.plato1  || '',  // E  Plato 1
+        data.cant1   || 1,   // F  Cant.1
+        data.plato2  || '',  // G  Plato 2
+        data.cant2   || '',  // H  Cant.2
+        data.plato3  || '',  // I  Plato 3
+        data.cant3   || '',  // J  Cant.3
+        data.extra1  || '',  // K  Extra 1
+        data.cantE1  || '',  // L  Cant.E1
+        data.extra2  || '',  // M  Extra 2
+        data.cantE2  || '',  // N  Cant.E2
+        data.extra3  || '',  // O  Extra 3
+        data.cantE3  || '',  // P  Cant.E3
+      ]]);
+
+      // Escribir columnas Z–AF (pago, estado, notas, timestamp, dirección, descuento, propina)
+      // Saltamos Q–Y (cols 17–25) que tienen fórmulas de precio/subtotal/total
+      sheet.getRange(filaDestino, COL_PAGO, 1, 7).setValues([[
+        data.pago      || 'Pendiente',     // Z  Pago
+        data.estado    || 'Pendiente',     // AA Estado
+        data.notas     || '',              // AB Notas
+        new Date().toISOString(),          // AC Timestamp
+        data.direccion || '',              // AD Dirección
+        data.descuento || 0,              // AE Descuento
+        data.propina   || 0               // AF Propina
+      ]]);
+
+      sheet.getRange(filaDestino, COL_FECHA).setNumberFormat('dd/MM/yyyy');
+
+      Logger.log('Pedido #' + newId + ' — ' + data.cliente + ' (fila ' + filaDestino + ')');
+      return jsonResponse({ ok: true, id: newId, fila: filaDestino });
+    }
+
+    // ── REGISTRAR CLIENTE ────────────────────────────────────
+    if (action === 'cliente') {
+      const data = JSON.parse(e.parameter.d || '{}');
+      const hoja = ss.getSheetByName(HOJA_CLIENTES);
+
+      // Verificar duplicado por nombre
+      const ultimaFila = hoja.getLastRow();
+      if (ultimaFila >= 2) {
+        const nombres = hoja.getRange(2, COL_NOMBRE_CLI, ultimaFila - 1, 1).getValues().flat();
+        const dup = nombres.find(n =>
+          n.toString().trim().toLowerCase() === (data.nombre || '').trim().toLowerCase()
+        );
+        if (dup) {
+          return jsonResponse({ ok: false, error: 'Cliente "' + dup + '" ya existe.' });
+        }
+      }
+
+      // Siguiente ID
+      let maxId = 0;
+      if (ultimaFila >= 2) {
+        const ids = hoja.getRange(2, COL_ID_CLI, ultimaFila - 1, 1).getValues().flat();
+        ids.forEach(id => {
+          const match = id.toString().match(/CLI-(\d+)/);
+          if (match) maxId = Math.max(maxId, parseInt(match[1]));
+        });
+      }
+      const nuevoId = 'CLI-' + String(maxId + 1).padStart(3, '0');
+
+      // Primera fila vacía
+      const colB = hoja.getRange(2, COL_NOMBRE_CLI, hoja.getMaxRows() - 1, 1).getValues();
+      let filaDestino = -1;
+      for (let i = 0; i < colB.length; i++) {
+        if (colB[i][0].toString().trim() === '') { filaDestino = i + 2; break; }
+      }
+      if (filaDestino === -1) filaDestino = hoja.getLastRow() + 1;
+
+      hoja.getRange(filaDestino, COL_ID_CLI, 1, 4).setValues([[
+        nuevoId,
+        data.nombre    || '',
+        data.telefono  || '',
+        data.direccion || ''
+      ]]);
+      invalidarCache(HOJA_CLIENTES);
+
+      Logger.log('Cliente ' + nuevoId + ' — ' + data.nombre + ' (fila ' + filaDestino + ')');
+      return jsonResponse({ ok: true, id: nuevoId, nombre: data.nombre });
+    }
+
+    return jsonResponse({ ok: false, error: 'Acción no reconocida: ' + action });
+
+  } catch (err) {
+    Logger.log('Error en doGet: ' + err.message);
+    return jsonResponse({ ok: false, error: err.message });
+  }
 }
 
-:root {
-  --orange: #FF6B00;
-  --orange-dark: #E55A00;
-  --white: #FFFFFF;
-  --gray-light: #F5F5F5;
-  --gray-mid: #E0E0E0;
-  --gray-text: #666;
-  --green: #2E7D32;
-  --green-bg: #E8F5E9;
-  --red: #C62828;
-  --red-bg: #FFEBEE;
-  --yellow: #F57F17;
-  --yellow-bg: #FFFDE7;
-  --header-h: 56px;
-  --tabs-h: 60px;
+// Helper: respuesta JSON con headers correctos
+function jsonResponse(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
-html, body {
-  height: 100%;
-  background: #ECECEC;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 16px;
-  color: #222;
+// ═══════════════════════════════════════════════════════════════
+// doPost — se mantiene por compatibilidad (no usado desde app móvil)
+// ═══════════════════════════════════════════════════════════════
+function doPost(e) {
+  // Redirigir al doGet pasando los parámetros equivalentes
+  try {
+    const body   = JSON.parse(e.postData.contents);
+    const fakeE  = {
+      parameter: {
+        action: body.action,
+        d: JSON.stringify(body.data)
+      }
+    };
+    return doGet(fakeE);
+  } catch (err) {
+    return jsonResponse({ ok: false, error: err.message });
+  }
 }
 
-.app {
-  max-width: 480px;
-  margin: 0 auto;
-  min-height: 100%;
-  background: var(--white);
-  position: relative;
-  display: flex;
-  flex-direction: column;
+// ═══════════════════════════════════════════════════════════════
+// EVENTO PRINCIPAL: onEdit
+// ═══════════════════════════════════════════════════════════════
+function onEdit(e) {
+  try {
+    const sheet = e.range.getSheet();
+    if (sheet.getName() !== HOJA_PEDIDOS) return;
+
+    const col   = e.range.getColumn();
+    const row   = e.range.getRow();
+    if (row < 2) return;
+
+    const texto = e.value;
+    const ss    = SpreadsheetApp.getActiveSpreadsheet();
+
+    if (!texto || texto.trim() === "") {
+      e.range.clearNote();
+      if (col === COL_CLIENTE) {
+        resetValidacion(e.range, getListaDesdeCache(ss, HOJA_CLIENTES, COL_NOMBRE_CLI));
+      } else if ([COL_PLATO1, COL_PLATO2, COL_PLATO3].includes(col)) {
+        resetValidacion(e.range, getListaDesdeCache(ss, HOJA_PLATOS, COL_NOMBRE_PLATO));
+        const colPrecio = col === COL_PLATO1 ? COL_PRECIO_P1 : col === COL_PLATO2 ? COL_PRECIO_P2 : COL_PRECIO_P3;
+        sheet.getRange(row, colPrecio).clearContent();
+        sheet.getRange(row, col + 1).clearContent();
+      } else if ([COL_EXTRA1, COL_EXTRA2, COL_EXTRA3].includes(col)) {
+        resetValidacion(e.range, getListaDesdeCache(ss, HOJA_EXTRAS, COL_NOMBRE_EXTRA));
+        const colPrecio = col === COL_EXTRA1 ? COL_PRECIO_E1 : col === COL_EXTRA2 ? COL_PRECIO_E2 : COL_PRECIO_E3;
+        sheet.getRange(row, colPrecio).clearContent();
+        sheet.getRange(row, col + 1).clearContent();
+      } else if (col === COL_PAGO) {
+        resetValidacionRango(e.range, HOJA_CONFIG + "!B5:B7");
+      } else if (col === COL_ESTADO) {
+        resetValidacionRango(e.range, HOJA_CONFIG + "!B7:B11");
+      }
+      return;
+    }
+
+    if (col === COL_CLIENTE) {
+      asignarFechaHora(sheet, row);
+      asignarIdPedido(sheet, row);
+      asignarDefectoPagoEstado(sheet, row, ss);
+
+      const lista = getListaDesdeCache(ss, HOJA_CLIENTES, COL_NOMBRE_CLI);
+      const coincidencias = lista.filter(n =>
+        n.toString().toLowerCase().includes(texto.toLowerCase())
+      );
+
+      if (coincidencias.length === 0) {
+        PropertiesService.getScriptProperties().setProperty("nuevo_cliente_nombre", texto);
+        PropertiesService.getScriptProperties().setProperty("nuevo_cliente_fila", String(row));
+        mostrarFormularioCliente(texto);
+        return;
+      }
+      if (coincidencias.length === 1) {
+        e.range.setValue(coincidencias[0]);
+        e.range.clearNote();
+        resetValidacion(e.range, lista);
+        return;
+      }
+      const rule = SpreadsheetApp.newDataValidation()
+        .requireValueInList(coincidencias, true).setAllowInvalid(true).build();
+      e.range.setDataValidation(rule);
+      e.range.setNote("💡 " + coincidencias.join(", "));
+      return;
+    }
+
+    if ([COL_PLATO1, COL_PLATO2, COL_PLATO3].includes(col)) {
+      const colCant = col + 1;
+      if (!sheet.getRange(row, colCant).getValue()) sheet.getRange(row, colCant).setValue(1);
+      const completado = autocomplete(e, ss, HOJA_PLATOS, COL_NOMBRE_PLATO, texto);
+      if (completado) {
+        const nombreFinal = sheet.getRange(row, col).getValue();
+        const colPrecio   = col === COL_PLATO1 ? COL_PRECIO_P1 : col === COL_PLATO2 ? COL_PRECIO_P2 : COL_PRECIO_P3;
+        rellenarPrecio(sheet, row, colPrecio, ss, HOJA_PLATOS, COL_NOMBRE_PLATO, COL_PRECIO_PLATO, nombreFinal);
+      }
+      return;
+    }
+
+    if ([COL_EXTRA1, COL_EXTRA2, COL_EXTRA3].includes(col)) {
+      const colCant = col + 1;
+      if (!sheet.getRange(row, colCant).getValue()) sheet.getRange(row, colCant).setValue(1);
+      const completado = autocomplete(e, ss, HOJA_EXTRAS, COL_NOMBRE_EXTRA, texto);
+      if (completado) {
+        const nombreFinal = sheet.getRange(row, col).getValue();
+        const colPrecio   = col === COL_EXTRA1 ? COL_PRECIO_E1 : col === COL_EXTRA2 ? COL_PRECIO_E2 : COL_PRECIO_E3;
+        rellenarPrecio(sheet, row, colPrecio, ss, HOJA_EXTRAS, COL_NOMBRE_EXTRA, COL_PRECIO_EXTRA, nombreFinal);
+      }
+      return;
+    }
+
+  } catch (err) {
+    Logger.log("Error en onEdit: " + err.message);
+  }
 }
 
-/* HEADER */
-.header {
-  position: fixed;
-  top: 0; left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 480px;
-  height: var(--header-h);
-  background: var(--orange);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  z-index: 100;
-  box-shadow: 0 2px 6px rgba(0,0,0,.2);
-}
-
-.header-title { color: var(--white); font-size: 22px; font-weight: 700; letter-spacing: .5px; }
-.header-status { font-size: 13px; color: rgba(255,255,255,.85); margin-left: 8px; }
-
-.btn-settings {
-  background: rgba(255,255,255,.2); border: 2px solid rgba(255,255,255,.6);
-  color: var(--white); font-size: 24px; cursor: pointer;
-  padding: 10px 14px; border-radius: 10px;
-  transition: background .2s; line-height: 1; min-width: 48px; min-height: 48px;
-  display: flex; align-items: center; justify-content: center;
-}
-.btn-settings:hover { background: rgba(255,255,255,.35); }
-
-/* MAIN CONTENT */
-.content {
-  margin-top: var(--header-h);
-  margin-bottom: var(--tabs-h);
-  flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.tab-panel { display: none; padding: 16px; padding-bottom: 24px; }
-.tab-panel.active { display: block; }
-
-/* BOTTOM TABS */
-.tabs {
-  position: fixed;
-  bottom: 0; left: 50%;
-  transform: translateX(-50%);
-  width: 100%; max-width: 480px;
-  height: var(--tabs-h);
-  background: var(--white);
-  border-top: 1px solid var(--gray-mid);
-  display: flex; z-index: 100;
-  box-shadow: 0 -2px 8px rgba(0,0,0,.08);
-}
-
-.tab-btn {
-  flex: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  border: none; background: none; cursor: pointer;
-  color: var(--gray-text); font-size: 11px; font-weight: 500;
-  gap: 3px; transition: color .2s; padding: 6px 0;
-}
-.tab-btn .tab-icon { font-size: 20px; }
-.tab-btn.active { color: var(--orange); }
-
-/* FORM ELEMENTS */
-.form-section {
-  background: var(--gray-light);
-  border-radius: 12px; padding: 14px; margin-bottom: 14px;
-}
-
-.section-title {
-  font-size: 13px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .6px;
-  color: var(--gray-text); margin-bottom: 12px;
-}
-
-.field { margin-bottom: 12px; }
-.field:last-child { margin-bottom: 0; }
-
-label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 5px; }
-label .req { color: var(--orange); }
-
-input[type=text], input[type=date], input[type=time],
-input[type=number], select, textarea {
-  width: 100%; padding: 12px;
-  border: 1.5px solid var(--gray-mid);
-  border-radius: 8px; font-size: 16px;
-  background: var(--white); color: #222;
-  appearance: none; -webkit-appearance: none;
-  outline: none; transition: border-color .2s;
-}
-input:focus, select:focus, textarea:focus { border-color: var(--orange); }
-
-select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px;
-}
-
-textarea { min-height: 80px; resize: vertical; }
-input[type=number] { -moz-appearance: textfield; }
-input[type=number]::-webkit-outer-spin-button,
-input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
-
-/* ITEM ROWS */
-.item-row {
-  background: var(--white); border-radius: 10px; padding: 12px;
-  margin-bottom: 10px; border: 1.5px solid var(--gray-mid); position: relative;
-}
-
-.item-row.collapsible {
-  overflow: hidden; max-height: 0; opacity: 0;
-  padding: 0 12px; margin-bottom: 0; border-width: 0;
-  transition: max-height .3s ease, opacity .3s ease, padding .3s ease,
-              margin-bottom .3s ease, border-width .3s ease;
-}
-
-.item-row.collapsible.show {
-  max-height: 300px; opacity: 1; padding: 12px;
-  margin-bottom: 10px; border-width: 1.5px;
-}
-
-.item-header {
-  display: flex; align-items: center;
-  justify-content: space-between; margin-bottom: 8px;
-}
-.item-label { font-size: 13px; font-weight: 600; color: #555; }
-
-.btn-remove {
-  background: none; border: none; color: var(--red);
-  font-size: 20px; cursor: pointer; padding: 2px 6px;
-  line-height: 1; border-radius: 4px;
-}
-.btn-remove:hover { background: var(--red-bg); }
-
-.row-2col {
-  display: grid; grid-template-columns: 1fr 80px;
-  gap: 8px; align-items: end;
-}
-
-.btn-add {
-  background: none; border: 1.5px dashed var(--orange);
-  color: var(--orange); border-radius: 8px; width: 100%;
-  padding: 10px; font-size: 14px; font-weight: 600;
-  cursor: pointer; margin-top: 4px; transition: background .2s;
-}
-.btn-add:hover { background: #FFF3E0; }
-
-/* TOTAL BOX */
-.total-box {
-  background: #FFF3E0; border: 2px solid var(--orange);
-  border-radius: 12px; padding: 14px; margin-bottom: 14px;
-}
-.total-box .total-title {
-  font-size: 13px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .6px; color: var(--orange); margin-bottom: 10px;
-}
-.total-line { display: flex; justify-content: space-between; font-size: 14px; color: #555; margin-bottom: 5px; }
-.total-divider { border: none; border-top: 1px solid var(--orange); margin: 8px 0; opacity: .4; }
-.total-final { display: flex; justify-content: space-between; font-size: 18px; font-weight: 700; color: var(--orange); }
-
-/* BUTTONS */
-.btn-submit {
-  width: 100%; height: 48px; background: var(--orange);
-  color: var(--white); border: none; border-radius: 10px;
-  font-size: 16px; font-weight: 700; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  gap: 8px; transition: background .2s, opacity .2s; margin-bottom: 8px;
-}
-.btn-submit:hover { background: var(--orange-dark); }
-.btn-submit:disabled { opacity: .5; cursor: not-allowed; }
-
-.spinner {
-  width: 18px; height: 18px;
-  border: 2px solid rgba(255,255,255,.4);
-  border-top-color: #fff; border-radius: 50%;
-  animation: spin .7s linear infinite; display: none;
-}
-.spinner.visible { display: block; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* MESSAGES */
-.msg { padding: 12px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 12px; display: none; line-height: 1.4; }
-.msg.show { display: block; }
-.msg.success { background: var(--green-bg); color: var(--green); border: 1px solid #A5D6A7; }
-.msg.error   { background: var(--red-bg);   color: var(--red);   border: 1px solid #EF9A9A; }
-.msg.warning { background: var(--yellow-bg);color: var(--yellow);border: 1px solid #FFF176; }
-
-/* LOADING OVERLAY */
-.loading-overlay {
-  display: none; align-items: center; justify-content: center;
-  flex-direction: column; gap: 14px; padding: 60px 20px; text-align: center;
-}
-.loading-overlay.show { display: flex; }
-.loading-spinner-lg {
-  width: 40px; height: 40px;
-  border: 4px solid var(--gray-mid); border-top-color: var(--orange);
-  border-radius: 50%; animation: spin .8s linear infinite;
-}
-.loading-text { color: var(--gray-text); font-size: 15px; }
-
-/* MODAL */
-.modal-overlay {
-  display: none; position: fixed; inset: 0;
-  background: rgba(0,0,0,.5); z-index: 200;
-  align-items: center; justify-content: center; padding: 20px;
-}
-.modal-overlay.show { display: flex; }
-.modal {
-  background: var(--white); border-radius: 16px; padding: 24px;
-  width: 100%; max-width: 420px; box-shadow: 0 8px 32px rgba(0,0,0,.2);
-}
-.modal-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
-.modal-sub   { font-size: 13px; color: var(--gray-text); margin-bottom: 18px; }
-.modal-status {
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 12px; border-radius: 8px; background: var(--gray-light);
-  font-size: 14px; margin-bottom: 14px; font-weight: 500;
-}
-.modal-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
-
-.btn-modal-primary {
-  height: 44px; background: var(--orange); color: var(--white);
-  border: none; border-radius: 8px; font-size: 15px; font-weight: 700;
-  cursor: pointer; transition: background .2s;
-}
-.btn-modal-primary:hover { background: var(--orange-dark); }
-
-.btn-modal-secondary {
-  height: 44px; background: none; color: var(--orange);
-  border: 1.5px solid var(--orange); border-radius: 8px;
-  font-size: 15px; font-weight: 600; cursor: pointer; transition: background .2s;
-}
-.btn-modal-secondary:hover { background: #FFF3E0; }
-
-.btn-modal-close {
-  height: 40px; background: none; color: var(--gray-text);
-  border: 1.5px solid var(--gray-mid); border-radius: 8px;
-  font-size: 14px; cursor: pointer;
-}
-.btn-retry {
-  margin-top: 12px; padding: 10px 24px; background: var(--orange);
-  color: white; border: none; border-radius: 8px;
-  font-size: 15px; font-weight: 600; cursor: pointer;
-}
-
-/* AUTOCOMPLETE */
-.ac-wrap { position: relative; }
-.ac-input {
-  width: 100%; padding: 12px 36px 12px 12px;
-  border: 1.5px solid var(--gray-mid); border-radius: 8px;
-  font-size: 16px; background: var(--white); color: #222;
-  outline: none; transition: border-color .2s;
-}
-.ac-input:focus { border-color: var(--orange); }
-.ac-input.has-value { border-color: var(--orange); background: #FFF8F3; }
-.ac-clear {
-  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-  background: none; border: none; color: #aaa; font-size: 18px;
-  cursor: pointer; line-height: 1; padding: 4px; display: none;
-}
-.ac-clear.visible { display: block; }
-.ac-dropdown {
-  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
-  background: var(--white); border: 1.5px solid var(--orange);
-  border-radius: 8px; max-height: 220px; overflow-y: auto;
-  z-index: 150; box-shadow: 0 4px 16px rgba(0,0,0,.12);
-  display: none;
-}
-.ac-dropdown.open { display: block; }
-.ac-option {
-  padding: 12px 14px; font-size: 15px; cursor: pointer;
-  border-bottom: 1px solid var(--gray-light); transition: background .15s;
-}
-.ac-option:last-child { border-bottom: none; }
-.ac-option:hover, .ac-option.highlighted { background: #FFF3E0; color: var(--orange); }
-.ac-option em { font-style: normal; font-weight: 700; color: var(--orange); }
-.ac-empty { padding: 12px 14px; font-size: 14px; color: var(--gray-text); }
-</style>
-</head>
-<body>
-<div class="app">
-
-  <!-- HEADER -->
-  <header class="header">
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span class="header-title">🍽️ Degusta</span>
-      <span class="header-status" id="headerStatus">🔴 Sin configurar</span>
-    </div>
-    <button class="btn-settings" onclick="openSettings()">⚙️</button>
-  </header>
-
-  <!-- MAIN CONTENT -->
-  <main class="content">
-
-    <!-- LOADING OVERLAY -->
-    <div class="loading-overlay" id="loadingOverlay">
-      <div class="loading-spinner-lg"></div>
-      <p class="loading-text">Cargando catálogo...</p>
-    </div>
-
-    <!-- TAB 1: PEDIDO -->
-    <div class="tab-panel active" id="panel-pedido">
-      <div id="msgPedido" class="msg"></div>
-
-      <div id="apiBanner" style="background:#FFF3E0;border:2px solid var(--orange);border-radius:12px;padding:16px;margin-bottom:14px;">
-        <div style="font-weight:700;font-size:15px;margin-bottom:4px;">⚙️ Web App URL</div>
-        <div style="font-size:13px;color:#888;margin-bottom:10px;">Pega la URL de la Web App del script para activar la app</div>
-        <input type="text" id="inlineApiKey" placeholder="https://script.google.com/macros/s/.../exec"
-          autocomplete="off" spellcheck="false"
-          style="width:100%;padding:12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:15px;margin-bottom:10px;background:white;">
-        <button onclick="saveInlineApiKey()"
-          style="background:var(--orange);color:white;border:none;border-radius:8px;padding:14px;font-size:16px;font-weight:700;cursor:pointer;width:100%;">
-          Guardar y cargar catálogo
-        </button>
-        <div id="inlineBannerMsg" style="margin-top:10px;font-size:13px;color:#C62828;display:none;"></div>
-      </div>
-
-      <div class="form-section">
-        <div class="section-title">🧑 Cliente</div>
-        <div class="field">
-          <label>Cliente <span class="req">*</span></label>
-          <div class="ac-wrap" id="acWrap-cliente">
-            <input class="ac-input" id="acInput-cliente" type="text" placeholder="Buscar cliente..."
-              autocomplete="off" oninput="acFilter('cliente')" onfocus="acOpen('cliente')" onkeydown="acKey(event,'cliente')">
-            <button class="ac-clear" id="acClear-cliente" onclick="acClear('cliente')">×</button>
-            <div class="ac-dropdown" id="acDrop-cliente"></div>
-          </div>
-          <input type="hidden" id="cliente">
-        </div>
-      </div>
-
-      <!-- PLATOS -->
-      <div class="form-section">
-        <div class="section-title">🍽️ Platos</div>
-        <div class="item-row" id="platoRow1">
-          <div class="item-header"><span class="item-label">Plato 1</span></div>
-          <div class="row-2col">
-            <div class="ac-wrap" id="acWrap-plato1">
-              <input class="ac-input" id="acInput-plato1" type="text" placeholder="Buscar plato..."
-                autocomplete="off" oninput="acFilter('plato1')" onfocus="acOpen('plato1')" onkeydown="acKey(event,'plato1')">
-              <button class="ac-clear" id="acClear-plato1" onclick="acClear('plato1')">×</button>
-              <div class="ac-dropdown" id="acDrop-plato1"></div>
-              <input type="hidden" id="plato1">
-            </div>
-            <div>
-              <label style="font-size:12px;">Cant.</label>
-              <input type="number" id="cantPlato1" value="1" min="1" onchange="recalcTotal()">
-            </div>
-          </div>
-        </div>
-
-        <div class="item-row collapsible" id="platoRow2">
-          <div class="item-header">
-            <span class="item-label">Plato 2</span>
-            <button class="btn-remove" onclick="removePlato(2)">×</button>
-          </div>
-          <div class="row-2col">
-            <div class="ac-wrap" id="acWrap-plato2">
-              <input class="ac-input" id="acInput-plato2" type="text" placeholder="Buscar plato..."
-                autocomplete="off" oninput="acFilter('plato2')" onfocus="acOpen('plato2')" onkeydown="acKey(event,'plato2')">
-              <button class="ac-clear" id="acClear-plato2" onclick="acClear('plato2')">×</button>
-              <div class="ac-dropdown" id="acDrop-plato2"></div>
-              <input type="hidden" id="plato2">
-            </div>
-            <div>
-              <label style="font-size:12px;">Cant.</label>
-              <input type="number" id="cantPlato2" value="1" min="1" onchange="recalcTotal()">
-            </div>
-          </div>
-        </div>
-
-        <div class="item-row collapsible" id="platoRow3">
-          <div class="item-header">
-            <span class="item-label">Plato 3</span>
-            <button class="btn-remove" onclick="removePlato(3)">×</button>
-          </div>
-          <div class="row-2col">
-            <div class="ac-wrap" id="acWrap-plato3">
-              <input class="ac-input" id="acInput-plato3" type="text" placeholder="Buscar plato..."
-                autocomplete="off" oninput="acFilter('plato3')" onfocus="acOpen('plato3')" onkeydown="acKey(event,'plato3')">
-              <button class="ac-clear" id="acClear-plato3" onclick="acClear('plato3')">×</button>
-              <div class="ac-dropdown" id="acDrop-plato3"></div>
-              <input type="hidden" id="plato3">
-            </div>
-            <div>
-              <label style="font-size:12px;">Cant.</label>
-              <input type="number" id="cantPlato3" value="1" min="1" onchange="recalcTotal()">
-            </div>
-          </div>
-        </div>
-        <button class="btn-add" id="btnAddPlato" onclick="addPlato()">+ Agregar plato</button>
-      </div>
-
-      <!-- EXTRAS -->
-      <div class="form-section">
-        <div class="section-title">✨ Extras</div>
-        <div class="item-row" id="extraRow1">
-          <div class="item-header"><span class="item-label">Extra 1 <span style="font-weight:400;color:#999;">(opcional)</span></span></div>
-          <div class="row-2col">
-            <div class="ac-wrap" id="acWrap-extra1">
-              <input class="ac-input" id="acInput-extra1" type="text" placeholder="Buscar extra..."
-                autocomplete="off" oninput="acFilter('extra1')" onfocus="acOpen('extra1')" onkeydown="acKey(event,'extra1')">
-              <button class="ac-clear" id="acClear-extra1" onclick="acClear('extra1')">×</button>
-              <div class="ac-dropdown" id="acDrop-extra1"></div>
-              <input type="hidden" id="extra1">
-            </div>
-            <div>
-              <label style="font-size:12px;">Cant.</label>
-              <input type="number" id="cantExtra1" value="1" min="1" onchange="recalcTotal()">
-            </div>
-          </div>
-        </div>
-
-        <div class="item-row collapsible" id="extraRow2">
-          <div class="item-header">
-            <span class="item-label">Extra 2</span>
-            <button class="btn-remove" onclick="removeExtra(2)">×</button>
-          </div>
-          <div class="row-2col">
-            <div class="ac-wrap" id="acWrap-extra2">
-              <input class="ac-input" id="acInput-extra2" type="text" placeholder="Buscar extra..."
-                autocomplete="off" oninput="acFilter('extra2')" onfocus="acOpen('extra2')" onkeydown="acKey(event,'extra2')">
-              <button class="ac-clear" id="acClear-extra2" onclick="acClear('extra2')">×</button>
-              <div class="ac-dropdown" id="acDrop-extra2"></div>
-              <input type="hidden" id="extra2">
-            </div>
-            <div>
-              <label style="font-size:12px;">Cant.</label>
-              <input type="number" id="cantExtra2" value="1" min="1" onchange="recalcTotal()">
-            </div>
-          </div>
-        </div>
-
-        <div class="item-row collapsible" id="extraRow3">
-          <div class="item-header">
-            <span class="item-label">Extra 3</span>
-            <button class="btn-remove" onclick="removeExtra(3)">×</button>
-          </div>
-          <div class="row-2col">
-            <div class="ac-wrap" id="acWrap-extra3">
-              <input class="ac-input" id="acInput-extra3" type="text" placeholder="Buscar extra..."
-                autocomplete="off" oninput="acFilter('extra3')" onfocus="acOpen('extra3')" onkeydown="acKey(event,'extra3')">
-              <button class="ac-clear" id="acClear-extra3" onclick="acClear('extra3')">×</button>
-              <div class="ac-dropdown" id="acDrop-extra3"></div>
-              <input type="hidden" id="extra3">
-            </div>
-            <div>
-              <label style="font-size:12px;">Cant.</label>
-              <input type="number" id="cantExtra3" value="1" min="1" onchange="recalcTotal()">
-            </div>
-          </div>
-        </div>
-        <button class="btn-add" id="btnAddExtra" onclick="addExtra()">+ Agregar extra</button>
-      </div>
-
-      <!-- PAGO Y ESTADO -->
-      <div class="form-section">
-        <div class="section-title">💳 Pago y estado</div>
-        <div class="field">
-          <label for="metodoPago">Método de pago <span class="req">*</span></label>
-          <select id="metodoPago"><option value="">— Selecciona —</option></select>
-        </div>
-        <div class="field">
-          <label for="estado">Estado <span class="req">*</span></label>
-          <select id="estado">
-            <option value="Pendiente" selected>Pendiente</option>
-            <option value="Preparando">Preparando</option>
-            <option value="En camino">En camino</option>
-            <option value="Entregado">Entregado</option>
-            <option value="Cancelado">Cancelado</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- DETALLES -->
-      <div class="form-section">
-        <div class="section-title">📝 Detalles adicionales</div>
-        <div class="field">
-          <label for="notas">Notas <span style="font-weight:400;color:#999;">(opcional)</span></label>
-          <textarea id="notas" placeholder="Instrucciones especiales, alergias..."></textarea>
-        </div>
-        <div class="field">
-          <label for="direccion">Dirección de entrega <span style="font-weight:400;color:#999;">(opcional)</span></label>
-          <input type="text" id="direccion" placeholder="Calle, número, referencias...">
-        </div>
-        <div class="field">
-          <label for="descuento">Descuento ($)</label>
-          <input type="number" id="descuento" value="0" min="0" step="0.01" onchange="recalcTotal()">
-        </div>
-        <div class="field">
-          <label for="propina">Propina ($)</label>
-          <input type="number" id="propina" value="0" min="0" step="0.01" onchange="recalcTotal()">
-        </div>
-      </div>
-
-      <!-- TOTAL -->
-      <div class="total-box">
-        <div class="total-title">💰 Total estimado</div>
-        <div class="total-line"><span>Subtotal platos:</span><span id="tSubPlatos">$0.00</span></div>
-        <div class="total-line"><span>Subtotal extras:</span><span id="tSubExtras">$0.00</span></div>
-        <div class="total-line"><span>Descuento:</span><span id="tDescuento">-$0.00</span></div>
-        <div class="total-line"><span>Propina:</span><span id="tPropina">+$0.00</span></div>
-        <hr class="total-divider">
-        <div class="total-final"><span>TOTAL:</span><span id="tTotal">$0.00</span></div>
-      </div>
-
-      <button class="btn-submit" id="btnSubmitPedido" onclick="submitPedido()">
-        <span class="spinner" id="spinnerPedido"></span>
-        <span id="btnPedidoText">Registrar pedido</span>
-      </button>
-    </div>
-
-    <!-- TAB 2: CLIENTE -->
-    <div class="tab-panel" id="panel-cliente">
-      <div id="msgCliente" class="msg"></div>
-      <div class="form-section">
-        <div class="section-title">👤 Nuevo cliente</div>
-        <div class="field">
-          <label for="cliNombre">Nombre completo <span class="req">*</span></label>
-          <input type="text" id="cliNombre" placeholder="Nombre y referencias">
-        </div>
-        <div class="field">
-          <label for="cliTel">Teléfono <span style="font-weight:400;color:#999;">(opcional)</span></label>
-          <input type="text" id="cliTel" placeholder="+503 7000 0000">
-        </div>
-        <div class="field">
-          <label for="cliDir">Dirección <span style="font-weight:400;color:#999;">(opcional)</span></label>
-          <input type="text" id="cliDir" placeholder="Colonia, calle, número...">
-        </div>
-      </div>
-      <button class="btn-submit" id="btnSubmitCliente" onclick="submitCliente()">
-        <span class="spinner" id="spinnerCliente"></span>
-        <span id="btnClienteText">Registrar cliente</span>
-      </button>
-    </div>
-
-  </main>
-
-  <!-- BOTTOM TABS -->
-  <nav class="tabs">
-    <button class="tab-btn active" id="tab-pedido" onclick="switchTab('pedido')">
-      <span class="tab-icon">📦</span><span>Pedido</span>
-    </button>
-    <button class="tab-btn" id="tab-cliente" onclick="switchTab('cliente')">
-      <span class="tab-icon">👤</span><span>Cliente</span>
-    </button>
-  </nav>
-
+// ═══════════════════════════════════════════════════════════════
+// FORMULARIO EMERGENTE DE NUEVO CLIENTE
+// ═══════════════════════════════════════════════════════════════
+function mostrarFormularioCliente(nombrePrellenado) {
+  const html = HtmlService.createHtmlOutput(`
+<!DOCTYPE html><html><head><style>
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+body { padding: 20px; background: #f9f9f9; }
+h2 { font-size: 16px; color: #FF6B00; margin-bottom: 16px; }
+label { display: block; font-size: 13px; color: #444; margin-bottom: 4px; margin-top: 12px; }
+input { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+input:focus { outline: none; border-color: #FF6B00; }
+.error { color: #c0392b; font-size: 12px; margin-top: 6px; display: none;
+         background: #fdecea; padding: 8px 10px; border-radius: 6px; border-left: 3px solid #c0392b; }
+.buttons { display: flex; gap: 10px; margin-top: 20px; }
+button { flex: 1; padding: 10px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
+.btn-guardar { background: #FF6B00; color: white; }
+.btn-guardar:hover { background: #E55A00; }
+.btn-cancelar { background: #eee; color: #555; }
+.btn-guardar:disabled { background: #aaa; cursor: not-allowed; }
+</style></head><body>
+<h2>➕ Nuevo cliente</h2>
+<label>Nombre *</label>
+<input type="text" id="nombre" value="${nombrePrellenado}" placeholder="Nombre completo" />
+<label>Teléfono *</label>
+<input type="text" id="telefono" placeholder="Ej. 77861452" maxlength="20" oninput="limpiarError()" />
+<div class="error" id="error-tel"></div>
+<label>Dirección</label>
+<input type="text" id="direccion" placeholder="Ej. Merliot, Santa Tecla" />
+<div class="buttons">
+  <button class="btn-cancelar" onclick="cancelar()">Cancelar</button>
+  <button class="btn-guardar" id="btn-guardar" onclick="guardar()">Guardar cliente</button>
 </div>
-
-<!-- SETTINGS MODAL -->
-<div class="modal-overlay" id="modalSettings">
-  <div class="modal">
-    <div class="modal-title">⚙️ Configuración</div>
-    <div class="modal-sub">Ingresa la URL de la Web App del script. Se guarda en el dispositivo.</div>
-    <div class="modal-status" id="modalStatusBox">
-      <span id="modalStatusIcon">🔴</span>
-      <span id="modalStatusText">Sin URL configurada</span>
-    </div>
-    <div class="field">
-      <label for="apiKeyInput">URL de la Web App</label>
-      <input type="text" id="apiKeyInput" placeholder="https://script.google.com/macros/s/.../exec"
-        autocomplete="off" spellcheck="false">
-    </div>
-    <div class="modal-actions">
-      <button class="btn-modal-primary" onclick="saveApiKey()">Guardar y cargar datos</button>
-      <button class="btn-modal-secondary" id="btnReloadCatalog" onclick="reloadCatalog()" style="display:none;">🔄 Recargar catálogo</button>
-      <button class="btn-modal-close" onclick="closeSettings()">Cerrar</button>
-    </div>
-  </div>
-</div>
-
 <script>
-// ═══════════════════════════════════════════════════════════════
-// DEGUSTA — index.html
-// Correcciones aplicadas:
-//   APP-01: WEBAPP_URL ya no usa localStorage — solo sessionStorage
-//           (se borra al cerrar la pestaña; no persiste entre sesiones)
-//   APP-02: SHEET_ID eliminado del código fuente
-//   APP-03: removePlato/removeExtra rehecho — limpia TODOS los items
-//           >= n, no solo el n pedido, y recalcula platoCount/extraCount
-//           correctamente
-//   APP-05: acSelect llama recalcTotal() al elegir item del autocomplete
-//   APP-06: validateCantidad() valida entero >= 1 antes de submit
-//   APP-07: flag catalogLoading previene cargas concurrentes
-//   APP-09: cant2/3/cantE1-3 se envían como número o 0, nunca string ''
-//   APP-10: apiBanner se oculta en loadCatalog al inicio, no solo en éxito
-//   APP-11: debounce de 180ms en acFilter para evitar re-render en cada tecla
-//   APP-12: primer método de pago se pre-selecciona automáticamente
-//   APP-13: SHEET_ID eliminado (dead code + exposición de datos)
-//   APP-14: mensaje de éxito persiste 8s (era 5s) y tiene botón de cierre
-//   APP-15: fetch con AbortController — timeout de 20s en GET, 30s en POST
-// ═══════════════════════════════════════════════════════════════
-
-// ─── CONSTANTES ───────────────────────────────────────────────
-// FIX APP-01/APP-02: sessionStorage en lugar de localStorage;
-// SHEET_ID eliminado del cliente.
-let WEBAPP_URL = sessionStorage.getItem('degusta_webapp_url') || '';
-
-// ─── ESTADO ───────────────────────────────────────────────────
-let catalogLoaded  = false;
-let catalogLoading = false;  // FIX APP-07: previene cargas concurrentes
-let platos     = [];
-let extras     = [];
-let clientes   = [];
-let metodosPago = [];
-let platoCount = 1;
-let extraCount = 1;
-
-// ─── AUTOCOMPLETE STATE ───────────────────────────────────────
-const acData  = {};   // { key: [{label, value}] }
-const acIndex = {};   // { key: number } — highlighted option index
-
-// ─── INIT ─────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', () => {
-  if (WEBAPP_URL) {
-    // FIX APP-10: ocultar banner desde el principio si ya hay URL
-    const banner = document.getElementById('apiBanner');
-    if (banner) banner.style.display = 'none';
-    loadCatalog();
-  }
-});
-
-// ─── TAB SWITCHING ────────────────────────────────────────────
-function switchTab(tab) {
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('panel-' + tab).classList.add('active');
-  document.getElementById('tab-'   + tab).classList.add('active');
+function limpiarError() { document.getElementById('error-tel').style.display='none'; }
+function cancelar() { google.script.run.cancelarNuevoCliente(); google.script.host.close(); }
+function guardar() {
+  const nombre=document.getElementById('nombre').value.trim();
+  const telefono=document.getElementById('telefono').value.trim();
+  const direccion=document.getElementById('direccion').value.trim();
+  if(!nombre){alert('El nombre es obligatorio.');return;}
+  if(!telefono){alert('El teléfono es obligatorio.');return;}
+  document.getElementById('btn-guardar').disabled=true;
+  document.getElementById('btn-guardar').textContent='Guardando...';
+  google.script.run
+    .withSuccessHandler(function(r){
+      if(r.ok){google.script.host.close();}
+      else{
+        const el=document.getElementById('error-tel');
+        el.textContent=r.mensaje; el.style.display='block';
+        document.getElementById('btn-guardar').disabled=false;
+        document.getElementById('btn-guardar').textContent='Guardar cliente';
+      }
+    })
+    .withFailureHandler(function(err){
+      alert('Error: '+err.message);
+      document.getElementById('btn-guardar').disabled=false;
+      document.getElementById('btn-guardar').textContent='Guardar cliente';
+    })
+    .guardarClienteDesdeFormulario(nombre,telefono,direccion);
+}
+</script></body></html>`)
+  .setWidth(360).setHeight(340).setTitle("Nuevo cliente");
+  SpreadsheetApp.getUi().showModalDialog(html, "Nuevo cliente");
 }
 
-// ─── SETTINGS MODAL ───────────────────────────────────────────
-function openSettings() {
-  document.getElementById('apiKeyInput').value = WEBAPP_URL;
-  updateModalStatus();
-  document.getElementById('modalSettings').classList.add('show');
-}
-function closeSettings() {
-  document.getElementById('modalSettings').classList.remove('show');
-}
-
-function updateModalStatus() {
-  const icon       = document.getElementById('modalStatusIcon');
-  const text       = document.getElementById('modalStatusText');
-  const headerSt   = document.getElementById('headerStatus');
-  const reloadBtn  = document.getElementById('btnReloadCatalog');
-
-  if (catalogLoading) {
-    icon.textContent = '🟡'; text.textContent = 'Cargando catálogo...';
-    headerSt.textContent = '🟡 Cargando...';
-  } else if (catalogLoaded) {
-    icon.textContent = '🟢'; text.textContent = 'Catálogo cargado correctamente';
-    headerSt.textContent = '🟢 Listo';
-    reloadBtn.style.display = 'block';
-  } else {
-    icon.textContent = '🔴';
-    text.textContent  = WEBAPP_URL ? 'Error al cargar catálogo' : 'Sin URL de Web App configurada';
-    headerSt.textContent = WEBAPP_URL ? '🔴 Error' : '🔴 Sin configurar';
-    reloadBtn.style.display = WEBAPP_URL ? 'block' : 'none';
-  }
-}
-
-// FIX APP-01: guardar en sessionStorage (se borra al cerrar pestaña)
-function saveApiKey() {
-  const val = document.getElementById('apiKeyInput').value.trim();
-  if (!val) { alert('Por favor ingresa la URL de la Web App.'); return; }
-  WEBAPP_URL = val;
-  sessionStorage.setItem('degusta_webapp_url', val);
-  closeSettings();
-  loadCatalog();
-}
-
-function saveInlineApiKey() {
-  const val = document.getElementById('inlineApiKey').value.trim();
-  const msgEl = document.getElementById('inlineBannerMsg');
-  if (!val) { msgEl.textContent = 'Ingresa la URL primero.'; msgEl.style.display = 'block'; return; }
-  WEBAPP_URL = val;
-  sessionStorage.setItem('degusta_webapp_url', val);
-  msgEl.style.display = 'none';
-  const banner = document.getElementById('apiBanner');
-  if (banner) banner.style.display = 'none';
-  loadCatalog();
-}
-
-function reloadCatalog() {
-  closeSettings();
-  loadCatalog();
-}
-
-// ─── API HELPERS ──────────────────────────────────────────────
-// FIX APP-15: AbortController con timeout configurable
-async function fetchWithTimeout(url, options = {}, timeoutMs = 20000) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+function guardarClienteDesdeFormulario(nombre, telefono, direccion) {
   try {
-    const res = await fetch(url, { ...options, signal: ctrl.signal });
-    clearTimeout(timer);
-    return res;
-  } catch (e) {
-    clearTimeout(timer);
-    if (e.name === 'AbortError') throw new Error('Tiempo de espera agotado. Intenta de nuevo.');
-    throw e;
-  }
-}
-
-async function webappGet(params = {}) {
-  const url = new URL(WEBAPP_URL);
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetchWithTimeout(url.toString(), {}, 20000);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error || 'Error desconocido');
-  return data;
-}
-
-async function webappPost(action, data) {
-  const res = await fetchWithTimeout(WEBAPP_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, data }),
-    redirect: 'follow'
-  }, 30000);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const result = await res.json();
-  if (!result.ok) throw new Error(result.error || 'Error desconocido');
-  return result;
-}
-
-// ─── CATALOG LOADING ──────────────────────────────────────────
-async function loadCatalog() {
-  if (!WEBAPP_URL) return;
-  // FIX APP-07: evitar cargas concurrentes
-  if (catalogLoading) return;
-
-  catalogLoading = true;
-  catalogLoaded  = false;
-  updateModalStatus();
-
-  const overlay = document.getElementById('loadingOverlay');
-  overlay.innerHTML = `<div class="loading-spinner-lg"></div><p class="loading-text">Cargando catálogo...</p>`;
-  overlay.classList.add('show');
-  document.getElementById('panel-pedido').style.display  = 'none';
-  document.getElementById('panel-cliente').style.display = 'none';
-
-  try {
-    const catalogo = await webappGet({ action: 'catalogo' });
-
-    platos = (catalogo.platos || []).map(p => ({
-      nombre:   p.nombre,
-      categoria: p.categoria || 'General',
-      precio:   parseFloat(p.precio) || 0
-    }));
-
-    extras = (catalogo.extras || []).map(e => ({
-      nombre: e.nombre,
-      precio: parseFloat(e.precio) || 0
-    }));
-
-    clientes    = (catalogo.clientes || []).filter(c => c && c.trim());
-    metodosPago = (catalogo.metodos  || ['Efectivo','Transferencia'])
-                    .filter(m => m && m.trim());
-
-    populateDropdowns();
-
-    catalogLoaded  = true;
-    catalogLoading = false;
-    updateModalStatus();
-
-    overlay.classList.remove('show');
-    document.getElementById('panel-pedido').style.display  = '';
-    document.getElementById('panel-cliente').style.display = '';
-
-    const banner = document.getElementById('apiBanner');
-    if (banner) banner.style.display = 'none';
-
-  } catch(e) {
-    catalogLoading = false;
-    catalogLoaded  = false;
-    updateModalStatus();
-
-    overlay.innerHTML = `
-      <div style="color:var(--red);font-size:15px;text-align:center;padding:20px;">
-        <div style="font-size:40px;margin-bottom:12px;">❌</div>
-        <strong>Error al cargar catálogo</strong><br>
-        <span style="font-size:13px;color:#888;margin-top:6px;display:block;">${e.message}</span>
-        <button class="btn-retry" onclick="retryLoad()">Reintentar</button>
-      </div>`;
-    overlay.classList.add('show');
-    document.getElementById('panel-pedido').style.display  = 'none';
-    document.getElementById('panel-cliente').style.display = 'none';
-  }
-}
-
-function retryLoad() {
-  loadCatalog();
-}
-
-// ─── POPULATE DROPDOWNS ───────────────────────────────────────
-function populateDropdowns() {
-  // Métodos de pago
-  const pagoSel = document.getElementById('metodoPago');
-  pagoSel.innerHTML = '<option value="">— Selecciona —</option>';
-  metodosPago.forEach((m, i) => {
-    const opt = document.createElement('option');
-    opt.value = m; opt.textContent = m;
-    // FIX APP-12: pre-seleccionar primer método de pago
-    if (i === 0) opt.selected = true;
-    pagoSel.appendChild(opt);
-  });
-
-  // Autocompletes
-  acInit('cliente', clientes.map(c => ({ label: c, value: c })));
-
-  ['plato1','plato2','plato3'].forEach(id => {
-    acInit(id, platos.map(p => ({
-      label: p.nombre + (p.precio > 0 ? ` — $${p.precio.toFixed(2)}` : ''),
-      value: p.nombre
-    })));
-  });
-
-  ['extra1','extra2','extra3'].forEach(id => {
-    acInit(id, extras.map(e => ({
-      label: e.nombre + (e.precio > 0 ? ` — $${e.precio.toFixed(2)}` : ''),
-      value: e.nombre
-    })));
-  });
-
-  recalcTotal();
-}
-
-// ─── PLATO/EXTRA ADD/REMOVE ───────────────────────────────────
-function addPlato() {
-  if (platoCount >= 3) return;
-  platoCount++;
-  document.getElementById(`platoRow${platoCount}`).classList.add('show');
-  if (platoCount === 3) document.getElementById('btnAddPlato').style.display = 'none';
-}
-
-// FIX APP-03: limpia todos los platos >= n, recalcula platoCount correctamente
-function removePlato(n) {
-  for (let i = n; i <= 3; i++) {
-    acClear(`plato${i}`);
-    document.getElementById(`cantPlato${i}`).value = 1;
-    if (i > 1) document.getElementById(`platoRow${i}`).classList.remove('show');
-  }
-  platoCount = n - 1;
-  document.getElementById('btnAddPlato').style.display = '';
-  recalcTotal();
-}
-
-function addExtra() {
-  if (extraCount >= 3) return;
-  extraCount++;
-  document.getElementById(`extraRow${extraCount}`).classList.add('show');
-  if (extraCount === 3) document.getElementById('btnAddExtra').style.display = 'none';
-}
-
-// FIX APP-03: ídem para extras
-function removeExtra(n) {
-  for (let i = n; i <= 3; i++) {
-    acClear(`extra${i}`);
-    document.getElementById(`cantExtra${i}`).value = 1;
-    if (i > 1) document.getElementById(`extraRow${i}`).classList.remove('show');
-  }
-  extraCount = n - 1;
-  document.getElementById('btnAddExtra').style.display = '';
-  recalcTotal();
-}
-
-// ─── TOTAL CALCULATION ────────────────────────────────────────
-function getPrecioPlato(nombre) {
-  const p = platos.find(x => x.nombre === nombre);
-  return p ? p.precio : 0;
-}
-function getPrecioExtra(nombre) {
-  const e = extras.find(x => x.nombre === nombre);
-  return e ? e.precio : 0;
-}
-function fmt(n) { return '$' + n.toFixed(2); }
-
-function recalcTotal() {
-  let subPlatos = 0, subExtras = 0;
-  [1,2,3].forEach(i => {
-    const nombre = document.getElementById(`plato${i}`).value;
-    const cant   = Math.max(1, parseInt(document.getElementById(`cantPlato${i}`).value) || 1);
-    if (nombre) subPlatos += getPrecioPlato(nombre) * cant;
-  });
-  [1,2,3].forEach(i => {
-    const nombre = document.getElementById(`extra${i}`).value;
-    const cant   = Math.max(1, parseInt(document.getElementById(`cantExtra${i}`).value) || 1);
-    if (nombre) subExtras += getPrecioExtra(nombre) * cant;
-  });
-
-  const descuento = Math.max(0, parseFloat(document.getElementById('descuento').value) || 0);
-  const propina   = Math.max(0, parseFloat(document.getElementById('propina').value)   || 0);
-  const total     = subPlatos + subExtras - descuento + propina;
-
-  document.getElementById('tSubPlatos').textContent = fmt(subPlatos);
-  document.getElementById('tSubExtras').textContent = fmt(subExtras);
-  document.getElementById('tDescuento').textContent = '-' + fmt(descuento);
-  document.getElementById('tPropina').textContent   = '+' + fmt(propina);
-  document.getElementById('tTotal').textContent     = fmt(Math.max(0, total));
-}
-
-// ─── MESSAGES ─────────────────────────────────────────────────
-// FIX APP-14: mensaje de éxito dura 8s y tiene botón ×
-function showMsg(id, type, text) {
-  const el = document.getElementById(id);
-  el.className = `msg ${type} show`;
-  if (type === 'success') {
-    el.innerHTML = `<span>${text}</span>
-      <button onclick="hideMsg('${id}')"
-        style="float:right;background:none;border:none;font-size:18px;cursor:pointer;color:inherit;margin-left:8px;">×</button>`;
-  } else {
-    el.textContent = text;
-  }
-  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  if (type === 'success') setTimeout(() => el.classList.remove('show'), 8000);
-}
-function hideMsg(id) {
-  document.getElementById(id).classList.remove('show');
-}
-
-// ─── VALIDACIÓN DE CANTIDADES ─────────────────────────────────
-// FIX APP-06: valida que las cantidades sean enteros >= 1
-function validateCantidades() {
-  const campos = [
-    'cantPlato1','cantPlato2','cantPlato3',
-    'cantExtra1','cantExtra2','cantExtra3'
-  ];
-  for (const id of campos) {
-    const val = parseInt(document.getElementById(id).value);
-    const plato = id.includes('Plato') ? document.getElementById(`plato${id.slice(-1)}`).value : null;
-    const extra = id.includes('Extra') ? document.getElementById(`extra${id.slice(-1)}`).value : null;
-    const tieneItem = plato || extra;
-    if (tieneItem && (isNaN(val) || val < 1)) {
-      return `Cantidad inválida en "${id.replace('cant','')}" — debe ser un número entero mayor a 0.`;
+    const ss   = SpreadsheetApp.getActiveSpreadsheet();
+    const hoja = ss.getSheetByName(HOJA_CLIENTES);
+    const ultimaFila = hoja.getLastRow();
+    if (ultimaFila >= 2) {
+      const datos = hoja.getRange(2, COL_ID_CLI, ultimaFila - 1, COL_TELEFONO_CLI).getValues();
+      for (const fila of datos) {
+        const telExistente    = fila[COL_TELEFONO_CLI - 1].toString().trim();
+        const nombreExistente = fila[COL_NOMBRE_CLI  - 1].toString().trim();
+        if (telExistente !== "" && telExistente === telefono.trim()) {
+          return { ok: false, mensaje: "⚠️ El número " + telefono + " ya está registrado para: " + nombreExistente };
+        }
+      }
     }
+    let maxId = 0;
+    if (ultimaFila >= 2) {
+      const ids = hoja.getRange(2, COL_ID_CLI, ultimaFila - 1, 1).getValues().flat();
+      ids.forEach(id => { const m = id.toString().match(/CLI-(\d+)/); if (m) maxId = Math.max(maxId, parseInt(m[1])); });
+    }
+    const nuevoId = "CLI-" + String(maxId + 1).padStart(3, "0");
+    const colB = hoja.getRange(2, COL_NOMBRE_CLI, hoja.getMaxRows() - 1, 1).getValues();
+    let filaDestino = -1;
+    for (let i = 0; i < colB.length; i++) {
+      if (colB[i][0].toString().trim() === "") { filaDestino = i + 2; break; }
+    }
+    if (filaDestino === -1) filaDestino = hoja.getLastRow() + 1;
+    hoja.getRange(filaDestino, COL_ID_CLI, 1, 4).setValues([[nuevoId, nombre, telefono, direccion]]);
+    invalidarCache(HOJA_CLIENTES);
+    const props = PropertiesService.getScriptProperties();
+    const filaP = parseInt(props.getProperty("nuevo_cliente_fila"));
+    if (filaP) {
+      const sheetP = ss.getSheetByName(HOJA_PEDIDOS);
+      sheetP.getRange(filaP, COL_CLIENTE).setValue(nombre);
+      resetValidacion(sheetP.getRange(filaP, COL_CLIENTE), getListaDesdeHoja(ss, HOJA_CLIENTES, COL_NOMBRE_CLI));
+    }
+    props.deleteProperty("nuevo_cliente_nombre");
+    props.deleteProperty("nuevo_cliente_fila");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, mensaje: "Error interno: " + err.message };
   }
-  return null;
 }
 
-// ─── SUBMIT PEDIDO ────────────────────────────────────────────
-async function submitPedido() {
-  if (!WEBAPP_URL)    { alert('Configura la URL de la Web App primero (⚙️)'); return; }
-  if (!catalogLoaded) { alert('Espera a que cargue el catálogo.'); return; }
-
-  hideMsg('msgPedido');
-
-  const cliente    = document.getElementById('cliente').value;
-  const plato1     = document.getElementById('plato1').value;
-  const metodoPago = document.getElementById('metodoPago').value;
-
-  if (!cliente)    { showMsg('msgPedido','error','⚠️ Selecciona un cliente.');          return; }
-  if (!plato1)     { showMsg('msgPedido','error','⚠️ Selecciona al menos el Plato 1.'); return; }
-  if (!metodoPago) { showMsg('msgPedido','error','⚠️ Selecciona un método de pago.');   return; }
-
-  // FIX APP-06: validar cantidades
-  const cantErr = validateCantidades();
-  if (cantErr) { showMsg('msgPedido','error', '⚠️ ' + cantErr); return; }
-
-  const btn     = document.getElementById('btnSubmitPedido');
-  const spinner = document.getElementById('spinnerPedido');
-  const btnText = document.getElementById('btnPedidoText');
-  btn.disabled = true;
-  spinner.classList.add('visible');
-  btnText.textContent = 'Registrando...';
-
+function cancelarNuevoCliente() {
   try {
-    const p2 = document.getElementById('plato2').value;
-    const p3 = document.getElementById('plato3').value;
-    const e1 = document.getElementById('extra1').value;
-    const e2 = document.getElementById('extra2').value;
-    const e3 = document.getElementById('extra3').value;
+    const props = PropertiesService.getScriptProperties();
+    const filaP = parseInt(props.getProperty("nuevo_cliente_fila"));
+    if (filaP) {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      ss.getSheetByName(HOJA_PEDIDOS).getRange(filaP, COL_CLIENTE).clearContent();
+    }
+    props.deleteProperty("nuevo_cliente_nombre");
+    props.deleteProperty("nuevo_cliente_fila");
+  } catch (err) { Logger.log("Error en cancelarNuevoCliente: " + err.message); }
+}
 
-    // FIX APP-09: cantidades opcionales como número (0) en lugar de string ''
-    const result = await webappPost('pedido', {
-      cliente,
-      plato1,
-      cant1:  parseInt(document.getElementById('cantPlato1').value) || 1,
-      plato2: p2 || '',
-      cant2:  p2 ? (parseInt(document.getElementById('cantPlato2').value) || 1) : 0,
-      plato3: p3 || '',
-      cant3:  p3 ? (parseInt(document.getElementById('cantPlato3').value) || 1) : 0,
-      extra1: e1 || '',
-      cantE1: e1 ? (parseInt(document.getElementById('cantExtra1').value) || 1) : 0,
-      extra2: e2 || '',
-      cantE2: e2 ? (parseInt(document.getElementById('cantExtra2').value) || 1) : 0,
-      extra3: e3 || '',
-      cantE3: e3 ? (parseInt(document.getElementById('cantExtra3').value) || 1) : 0,
-      pago:      metodoPago,
-      estado:    document.getElementById('estado').value || 'Pendiente',
-      notas:     document.getElementById('notas').value || '',
-      direccion: document.getElementById('direccion').value || '',
-      descuento: parseFloat(document.getElementById('descuento').value) || 0,
-      propina:   parseFloat(document.getElementById('propina').value)   || 0,
+function onSelectionChange(e) {
+  try {
+    const sheet = e.range.getSheet();
+    if (sheet.getName() !== HOJA_PEDIDOS) return;
+  } catch (err) { Logger.log("Error en onSelectionChange: " + err.message); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════
+function asignarFechaHora(sheet, row) {
+  const celdaFecha = sheet.getRange(row, COL_FECHA);
+  if (celdaFecha.getValue()) return;
+  const zona  = leerZonaHoraria();
+  const ahora = new Date();
+  const fechaStr = Utilities.formatDate(ahora, zona, "MM/dd/yyyy");
+  celdaFecha.setValue(new Date(fechaStr));
+  celdaFecha.setNumberFormat("dd/MM/yyyy");
+  sheet.getRange(row, COL_HORA).setValue(Utilities.formatDate(ahora, zona, "HH:mm"));
+}
+
+function asignarIdPedido(sheet, row) {
+  const celdaId = sheet.getRange(row, COL_ID_PED);
+  if (celdaId.getValue()) return;
+  const ultimaFila = sheet.getLastRow();
+  let maxId = 0;
+  if (ultimaFila >= 2) {
+    const ids = sheet.getRange(2, COL_ID_PED, ultimaFila - 1, 1).getValues().flat();
+    ids.forEach(id => { const num = parseInt(id); if (!isNaN(num) && num > maxId) maxId = num; });
+  }
+  celdaId.setValue(String(maxId + 1).padStart(3, "0"));
+}
+
+function asignarDefectoPagoEstado(sheet, row, ss) {
+  const celdaPago   = sheet.getRange(row, COL_PAGO);
+  const celdaEstado = sheet.getRange(row, COL_ESTADO);
+  if (!celdaPago.getValue())   celdaPago.setValue("Pendiente");
+  if (!celdaEstado.getValue()) celdaEstado.setValue("Pendiente");
+}
+
+function leerZonaHoraria() {
+  try { return leerConfigValor(4) || ZONA_HORARIA_DEFAULT; }
+  catch (e) { return ZONA_HORARIA_DEFAULT; }
+}
+
+function leerConfigValor(fila) {
+  try {
+    const hoja = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(HOJA_CONFIG);
+    if (!hoja) return null;
+    const val = hoja.getRange(fila, 2).getValue();
+    return val ? val.toString().trim() : null;
+  } catch (e) { return null; }
+}
+
+function autocomplete(e, ss, nombreHoja, columna, texto) {
+  const lista = getListaDesdeCache(ss, nombreHoja, columna);
+  const coincidencias = lista.filter(n => n.toString().toLowerCase().includes(texto.toLowerCase()));
+  if (coincidencias.length === 0) { e.range.clearNote(); return false; }
+  if (coincidencias.length === 1) {
+    e.range.setValue(coincidencias[0]); e.range.clearNote();
+    resetValidacion(e.range, lista); return true;
+  }
+  const rule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(coincidencias, true).setAllowInvalid(true).build();
+  e.range.setDataValidation(rule);
+  e.range.setNote("💡 " + coincidencias.join(", "));
+  return false;
+}
+
+function rellenarPrecio(sheet, row, colPrecio, ss, nombreHoja, colNombre, colPrecioBase, nombre) {
+  try {
+    const hoja = ss.getSheetByName(nombreHoja);
+    if (!hoja) return;
+    const numFilas = hoja.getLastRow() - 1;
+    if (numFilas < 1) return;
+    const datos = hoja.getRange(2, colNombre, numFilas, colPrecioBase - colNombre + 1).getValues();
+    for (const fila of datos) {
+      if (fila[0].toString().toLowerCase() === nombre.toString().toLowerCase()) {
+        const precio = fila[colPrecioBase - colNombre];
+        if (precio !== "") sheet.getRange(row, colPrecio).setValue(precio);
+        break;
+      }
+    }
+  } catch (err) { Logger.log("Error en rellenarPrecio: " + err.message); }
+}
+
+function resetValidacion(rango, lista) {
+  try {
+    if (!lista || lista.length === 0) return;
+    const rule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(lista, true).setAllowInvalid(true).build();
+    rango.setDataValidation(rule);
+  } catch (err) { Logger.log("Error en resetValidacion: " + err.message); }
+}
+
+function resetValidacionRango(rango, rangoFuente) {
+  try {
+    const fuenteRng = SpreadsheetApp.getActiveSpreadsheet().getRange(rangoFuente);
+    const rule = SpreadsheetApp.newDataValidation()
+      .requireValueInRange(fuenteRng, true).setAllowInvalid(false).build();
+    rango.setDataValidation(rule);
+  } catch (err) { Logger.log("Error en resetValidacionRango: " + err.message); }
+}
+
+function getListaDesdeCache(ss, nombreHoja, columna) {
+  try {
+    const cache = CacheService.getScriptCache();
+    const clave = "lista_" + nombreHoja + "_" + columna;
+    const guardado = cache.get(clave);
+    if (guardado) return JSON.parse(guardado);
+    const lista = getListaDesdeHoja(ss, nombreHoja, columna);
+    cache.put(clave, JSON.stringify(lista), CACHE_TTL);
+    return lista;
+  } catch (err) { return getListaDesdeHoja(ss, nombreHoja, columna); }
+}
+
+function invalidarCache(nombreHoja) {
+  try {
+    const cache = CacheService.getScriptCache();
+    [COL_NOMBRE_CLI, COL_NOMBRE_PLATO, COL_NOMBRE_EXTRA].forEach(col => {
+      cache.remove("lista_" + nombreHoja + "_" + col);
     });
-
-    const totalEl = document.getElementById('tTotal').textContent;
-    showMsg('msgPedido','success', `✅ Pedido #${result.id} registrado — Total: ${totalEl}`);
-    resetPedidoForm();
-
-  } catch(e) {
-    showMsg('msgPedido','error', `❌ Error al registrar: ${e.message}`);
-  } finally {
-    btn.disabled = false;
-    spinner.classList.remove('visible');
-    btnText.textContent = 'Registrar pedido';
-  }
+  } catch (err) { Logger.log("Error invalidando cache: " + err.message); }
 }
 
-function resetPedidoForm() {
-  acClear('cliente');
-  [1,2,3].forEach(i => {
-    acClear(`plato${i}`);
-    document.getElementById(`cantPlato${i}`).value = 1;
-    acClear(`extra${i}`);
-    document.getElementById(`cantExtra${i}`).value = 1;
-  });
-  [2,3].forEach(i => {
-    document.getElementById(`platoRow${i}`).classList.remove('show');
-    document.getElementById(`extraRow${i}`).classList.remove('show');
-  });
-  platoCount = 1;
-  extraCount = 1;
-  document.getElementById('btnAddPlato').style.display = '';
-  document.getElementById('btnAddExtra').style.display = '';
-  // Mantener el método de pago pre-seleccionado (no limpiar)
-  document.getElementById('estado').value    = 'Pendiente';
-  document.getElementById('notas').value     = '';
-  document.getElementById('direccion').value = '';
-  document.getElementById('descuento').value = 0;
-  document.getElementById('propina').value   = 0;
-  recalcTotal();
-}
-
-// ─── SUBMIT CLIENTE ───────────────────────────────────────────
-async function submitCliente() {
-  if (!WEBAPP_URL) { alert('Configura la URL de la Web App primero (⚙️)'); return; }
-  hideMsg('msgCliente');
-
-  const nombre = document.getElementById('cliNombre').value.trim();
-  const tel    = document.getElementById('cliTel').value.trim();
-  const dir    = document.getElementById('cliDir').value.trim();
-
-  if (!nombre) { showMsg('msgCliente','error','⚠️ El nombre es obligatorio.'); return; }
-
-  const btn     = document.getElementById('btnSubmitCliente');
-  const spinner = document.getElementById('spinnerCliente');
-  const btnText = document.getElementById('btnClienteText');
-  btn.disabled = true;
-  spinner.classList.add('visible');
-  btnText.textContent = 'Registrando...';
-
+function getListaDesdeHoja(ss, nombreHoja, columna) {
   try {
-    const result = await webappPost('cliente', { nombre, telefono: tel, direccion: dir });
-    showMsg('msgCliente','success', `✅ Cliente "${nombre}" registrado correctamente.`);
-    document.getElementById('cliNombre').value = '';
-    document.getElementById('cliTel').value    = '';
-    document.getElementById('cliDir').value    = '';
-    // Actualizar lista de clientes en autocomplete
-    clientes.push(nombre);
-    acInit('cliente', clientes.map(c => ({ label: c, value: c })));
-  } catch(e) {
-    showMsg('msgCliente','error', `❌ Error al registrar: ${e.message}`);
-  } finally {
-    btn.disabled = false;
-    spinner.classList.remove('visible');
-    btnText.textContent = 'Registrar cliente';
-  }
+    const hoja = ss.getSheetByName(nombreHoja);
+    if (!hoja) return [];
+    const ultima = hoja.getLastRow();
+    if (ultima < 2) return [];
+    return hoja.getRange(2, columna, ultima - 1, 1).getValues().flat().filter(n => n !== '');
+  } catch (err) { return []; }
+}
+
+function getListaConPrecio(ss, nombreHoja, colNombre, colPrecio) {
+  try {
+    const hoja = ss.getSheetByName(nombreHoja);
+    if (!hoja) return [];
+    const ultima = hoja.getLastRow();
+    if (ultima < 2) return [];
+    const datos = hoja.getRange(2, colNombre, ultima - 1, colPrecio - colNombre + 1).getValues();
+    return datos.filter(f => f[0] !== '').map(f => ({ nombre: f[0], precio: f[colPrecio - colNombre] || 0 }));
+  } catch (err) { return []; }
+}
+
+function getListaConPrecioYCategoria(ss, nombreHoja) {
+  try {
+    const hoja = ss.getSheetByName(nombreHoja);
+    if (!hoja) return [];
+    const ultima = hoja.getLastRow();
+    if (ultima < 2) return [];
+    // BASE_PLATOS: B=nombre, C=categoria, D=precio
+    const datos = hoja.getRange(2, 2, ultima - 1, 3).getValues();
+    return datos
+      .filter(f => f[0] !== '')
+      .map(f => ({ nombre: f[0], categoria: f[1] || 'General', precio: f[2] || 0 }));
+  } catch (err) { return []; }
 }
 
 // ═══════════════════════════════════════════════════════════════
-// AUTOCOMPLETE ENGINE
-// FIX APP-05: acSelect llama recalcTotal() al confirmar selección
-// FIX APP-11: debounce en acFilter (180ms)
+// CORRECCIONES DE DATOS — ejecutar una sola vez
 // ═══════════════════════════════════════════════════════════════
-
-let acDebounceTimers = {};
-
-function acInit(key, items) {
-  acData[key]  = items;
-  acIndex[key] = -1;
-}
-
-function acFilter(key) {
-  // FIX APP-11: debounce 180ms
-  clearTimeout(acDebounceTimers[key]);
-  acDebounceTimers[key] = setTimeout(() => _acFilterNow(key), 180);
-}
-
-function _acFilterNow(key) {
-  const input = document.getElementById(`acInput-${key}`);
-  const query = (input.value || '').toLowerCase().trim();
-  const drop  = document.getElementById(`acDrop-${key}`);
-  const items = acData[key] || [];
-
-  // Si no hay texto y el campo tiene valor guardado, no borrar la selección
-  if (!query) {
-    drop.classList.remove('open');
-    drop.innerHTML = '';
-    return;
-  }
-
-  const matches = items.filter(it => it.label.toLowerCase().includes(query));
-  acIndex[key]  = -1;
-
-  if (matches.length === 0) {
-    drop.innerHTML = `<div class="ac-empty">Sin resultados</div>`;
-    drop.classList.add('open');
-    return;
-  }
-
-  drop.innerHTML = matches.map((it, i) => {
-    const hl = it.label.replace(
-      new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')', 'gi'),
-      '<em>$1</em>'
-    );
-    return `<div class="ac-option" data-value="${it.value}" data-idx="${i}"
-      onmousedown="acSelect('${key}','${it.value.replace(/'/g,"\\'")}')">
-      ${hl}</div>`;
-  }).join('');
-  drop.classList.add('open');
-}
-
-// FIX APP-05: llama recalcTotal después de seleccionar
-function acSelect(key, value) {
-  const input  = document.getElementById(`acInput-${key}`);
-  const hidden = document.getElementById(key);
-  const clear  = document.getElementById(`acClear-${key}`);
-  const drop   = document.getElementById(`acDrop-${key}`);
-
-  // Mostrar el label (con precio) en el input visible, valor puro en hidden
-  const item = (acData[key] || []).find(it => it.value === value);
-  input.value  = item ? item.label : value;
-  hidden.value = value;
-
-  input.classList.add('has-value');
-  clear.classList.add('visible');
-  drop.classList.remove('open');
-  drop.innerHTML = '';
-  acIndex[key] = -1;
-
-  // FIX APP-05: recalcular total inmediatamente al seleccionar
-  recalcTotal();
-}
-
-function acOpen(key) {
-  const input = document.getElementById(`acInput-${key}`);
-  if (input.value) _acFilterNow(key);
-}
-
-function acClear(key) {
-  const input  = document.getElementById(`acInput-${key}`);
-  const hidden = document.getElementById(key);
-  const clear  = document.getElementById(`acClear-${key}`);
-  const drop   = document.getElementById(`acDrop-${key}`);
-
-  input.value  = '';
-  hidden.value = '';
-  input.classList.remove('has-value');
-  clear.classList.remove('visible');
-  drop.classList.remove('open');
-  drop.innerHTML = '';
-  acIndex[key] = -1;
-  recalcTotal();
-}
-
-function acKey(event, key) {
-  const drop    = document.getElementById(`acDrop-${key}`);
-  const options = drop.querySelectorAll('.ac-option');
-
-  if (event.key === 'ArrowDown') {
-    event.preventDefault();
-    acIndex[key] = Math.min(acIndex[key] + 1, options.length - 1);
-    _acHighlight(options, acIndex[key]);
-  } else if (event.key === 'ArrowUp') {
-    event.preventDefault();
-    acIndex[key] = Math.max(acIndex[key] - 1, 0);
-    _acHighlight(options, acIndex[key]);
-  } else if (event.key === 'Enter') {
-    event.preventDefault();
-    if (acIndex[key] >= 0 && options[acIndex[key]]) {
-      const val = options[acIndex[key]].dataset.value;
-      acSelect(key, val);
-    } else if (options.length === 1) {
-      acSelect(key, options[0].dataset.value);
+function corregirFechasComoString() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(HOJA_PEDIDOS);
+  if (!sheet) { SpreadsheetApp.getUi().alert("No se encontró PEDIDOS."); return; }
+  const ultimaFila = sheet.getLastRow();
+  if (ultimaFila < 2) { SpreadsheetApp.getUi().alert("No hay pedidos."); return; }
+  const rangeFechas = sheet.getRange(2, COL_FECHA, ultimaFila - 1, 1);
+  const valores = rangeFechas.getValues();
+  let corregidos = 0;
+  const nuevosValores = valores.map(fila => {
+    const val = fila[0];
+    if (typeof val === "string" && val.trim() !== "" && val !== "(fecha desconocida)") {
+      const partes = val.includes("/") ? val.split("/") : val.split("-");
+      if (partes.length === 3) {
+        const fecha = new Date(parseInt(partes[2]), parseInt(partes[1]) - 1, parseInt(partes[0]));
+        if (!isNaN(fecha.getTime())) { corregidos++; return [fecha]; }
+      }
     }
-  } else if (event.key === 'Escape') {
-    drop.classList.remove('open');
-  }
-}
-
-function _acHighlight(options, idx) {
-  options.forEach(o => o.classList.remove('highlighted'));
-  if (options[idx]) {
-    options[idx].classList.add('highlighted');
-    options[idx].scrollIntoView({ block: 'nearest' });
-  }
-}
-
-// Cerrar dropdown al hacer click fuera
-document.addEventListener('click', e => {
-  document.querySelectorAll('.ac-dropdown.open').forEach(drop => {
-    const wrap = drop.closest('.ac-wrap');
-    if (wrap && !wrap.contains(e.target)) {
-      drop.classList.remove('open');
-    }
+    return fila;
   });
-});
-</script>
-</body>
-</html>
+  rangeFechas.setValues(nuevosValores);
+  rangeFechas.setNumberFormat("dd/MM/yyyy");
+  SpreadsheetApp.getUi().alert("✅ " + corregidos + " fechas corregidas.");
+}
+
+function corregirPedidosSinFecha() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(HOJA_PEDIDOS);
+  if (!sheet) return;
+  const ultimaFila = sheet.getLastRow();
+  if (ultimaFila < 2) return;
+  const datos = sheet.getRange(2, 1, ultimaFila - 1, 4).getValues();
+  let maxId = 0;
+  datos.forEach(f => { const n = parseInt(f[0]); if (!isNaN(n) && n > maxId) maxId = n; });
+  let fechas = 0, ids = 0;
+  datos.forEach((fila, i) => {
+    const row = i + 2;
+    if (!fila[3]) return;
+    if (!fila[1]) { sheet.getRange(row, COL_FECHA).setValue("(fecha desconocida)"); sheet.getRange(row, COL_HORA).setValue("--:--"); fechas++; }
+    if (!fila[0]) { maxId++; sheet.getRange(row, COL_ID_PED).setValue(String(maxId).padStart(3,"0")); ids++; }
+  });
+  SpreadsheetApp.getUi().alert("✅ " + fechas + " fechas marcadas, " + ids + " IDs asignados.");
+}
+
+function corregirClientesSinId() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const hoja = ss.getSheetByName(HOJA_CLIENTES);
+  if (!hoja) return;
+  const ultimaFila = hoja.getLastRow();
+  if (ultimaFila < 2) return;
+  const datos = hoja.getRange(2, 1, ultimaFila - 1, 2).getValues();
+  let maxId = 0;
+  datos.forEach(f => { const m = f[0].toString().match(/CLI-(\d+)/); if (m) maxId = Math.max(maxId, parseInt(m[1])); });
+  let count = 0;
+  datos.forEach((fila, i) => {
+    if (!fila[0] && fila[1]) { maxId++; hoja.getRange(i + 2, COL_ID_CLI).setValue("CLI-" + String(maxId).padStart(3,"0")); count++; }
+  });
+  invalidarCache(HOJA_CLIENTES);
+  SpreadsheetApp.getUi().alert("✅ " + count + " clientes con ID asignado.");
+}
