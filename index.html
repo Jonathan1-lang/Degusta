@@ -354,8 +354,11 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 
       <div id="apiBanner" style="background:#FFF3E0;border:2px solid var(--orange);border-radius:12px;padding:16px;margin-bottom:14px;">
         <div style="font-weight:700;font-size:15px;margin-bottom:4px;">⚙️ Web App URL</div>
-        <div style="font-size:13px;color:#888;margin-bottom:10px;">Pega la URL de la Web App del script para activar la app</div>
+        <div style="font-size:13px;color:#888;margin-bottom:10px;">Pega la URL de la Web App del script y el token de acceso para activar la app</div>
         <input type="text" id="inlineApiKey" placeholder="https://script.google.com/macros/s/.../exec"
+          autocomplete="off" spellcheck="false"
+          style="width:100%;padding:12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:15px;margin-bottom:10px;background:white;">
+        <input type="password" id="inlineApiToken" placeholder="Token de acceso (CONFIG!B18)"
           autocomplete="off" spellcheck="false"
           style="width:100%;padding:12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:15px;margin-bottom:10px;background:white;">
         <button onclick="saveInlineApiKey()"
@@ -612,6 +615,11 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
       <input type="text" id="apiKeyInput" placeholder="https://script.google.com/macros/s/.../exec"
         autocomplete="off" spellcheck="false">
     </div>
+    <div class="field">
+      <label for="apiTokenInput">Token de acceso</label>
+      <input type="password" id="apiTokenInput" placeholder="Token (CONFIG!B18)"
+        autocomplete="off" spellcheck="false">
+    </div>
     <div class="modal-actions">
       <button class="btn-modal-primary" onclick="saveApiKey()">Guardar y cargar datos</button>
       <button class="btn-modal-secondary" id="btnReloadCatalog" onclick="reloadCatalog()" style="display:none;">🔄 Recargar catálogo</button>
@@ -645,7 +653,10 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 // ─── CONSTANTES ───────────────────────────────────────────────
 // FIX APP-01/APP-02: sessionStorage en lugar de localStorage;
 // SHEET_ID eliminado del cliente.
+// FIX R-01 (v10): token de autenticación enviado como parámetro "t"
+// en cada request. Se guarda en sessionStorage igual que la URL.
 let WEBAPP_URL = sessionStorage.getItem('degusta_webapp_url') || '';
+let API_TOKEN  = sessionStorage.getItem('degusta_token') || '';
 
 // ─── ESTADO ───────────────────────────────────────────────────
 let catalogLoaded  = false;
@@ -663,7 +674,7 @@ const acIndex = {};   // { key: number } — highlighted option index
 
 // ─── INIT ─────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  if (WEBAPP_URL) {
+  if (WEBAPP_URL && API_TOKEN) {   // FIX R-01 (v10): requiere URL + token
     // FIX APP-10: ocultar banner desde el principio si ya hay URL
     const banner = document.getElementById('apiBanner');
     if (banner) banner.style.display = 'none';
@@ -681,7 +692,8 @@ function switchTab(tab) {
 
 // ─── SETTINGS MODAL ───────────────────────────────────────────
 function openSettings() {
-  document.getElementById('apiKeyInput').value = WEBAPP_URL;
+  document.getElementById('apiKeyInput').value   = WEBAPP_URL;
+  document.getElementById('apiTokenInput').value = API_TOKEN;   // FIX R-01 (v10)
   updateModalStatus();
   document.getElementById('modalSettings').classList.add('show');
 }
@@ -712,20 +724,28 @@ function updateModalStatus() {
 
 // FIX APP-01: guardar en sessionStorage (se borra al cerrar pestaña)
 function saveApiKey() {
-  const val = document.getElementById('apiKeyInput').value.trim();
-  if (!val) { alert('Por favor ingresa la URL de la Web App.'); return; }
+  const val   = document.getElementById('apiKeyInput').value.trim();
+  const token = document.getElementById('apiTokenInput').value.trim();
+  if (!val)   { alert('Por favor ingresa la URL de la Web App.'); return; }
+  if (!token) { alert('Por favor ingresa el token de acceso.');   return; }
   WEBAPP_URL = val;
+  API_TOKEN  = token;
   sessionStorage.setItem('degusta_webapp_url', val);
+  sessionStorage.setItem('degusta_token', token);   // FIX R-01 (v10)
   closeSettings();
   loadCatalog();
 }
 
 function saveInlineApiKey() {
-  const val = document.getElementById('inlineApiKey').value.trim();
+  const val   = document.getElementById('inlineApiKey').value.trim();
+  const token = document.getElementById('inlineApiToken').value.trim();
   const msgEl = document.getElementById('inlineBannerMsg');
-  if (!val) { msgEl.textContent = 'Ingresa la URL primero.'; msgEl.style.display = 'block'; return; }
+  if (!val)   { msgEl.textContent = 'Ingresa la URL primero.';      msgEl.style.display = 'block'; return; }
+  if (!token) { msgEl.textContent = 'Ingresa el token de acceso.';  msgEl.style.display = 'block'; return; }
   WEBAPP_URL = val;
+  API_TOKEN  = token;
   sessionStorage.setItem('degusta_webapp_url', val);
+  sessionStorage.setItem('degusta_token', token);   // FIX R-01 (v10)
   msgEl.style.display = 'none';
   const banner = document.getElementById('apiBanner');
   if (banner) banner.style.display = 'none';
@@ -755,6 +775,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 20000) {
 
 async function webappGet(params = {}) {
   const url = new URL(WEBAPP_URL);
+  url.searchParams.set('t', API_TOKEN);   // FIX R-01 (v10)
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   const res = await fetchWithTimeout(url.toString(), {}, 20000);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -768,6 +789,7 @@ async function webappGet(params = {}) {
 // doGet en el script lee e.parameter.action y e.parameter.d.
 async function webappPost(action, data) {
   const url = new URL(WEBAPP_URL);
+  url.searchParams.set('t', API_TOKEN);   // FIX R-01 (v10)
   url.searchParams.set('action', action);
   url.searchParams.set('d', JSON.stringify(data));
   const res = await fetchWithTimeout(url.toString(), {}, 30000);
