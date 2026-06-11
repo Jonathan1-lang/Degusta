@@ -538,8 +538,8 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
           <input type="number" id="descuento" value="0" min="0" step="0.01" onchange="recalcTotal()">
         </div>
         <div class="field">
-          <label for="propina">Propina ($)</label>
-          <input type="number" id="propina" value="0" min="0" step="0.01" onchange="recalcTotal()">
+          <label for="delivery">Delivery ($)</label>
+          <input type="number" id="delivery" value="0" min="0" step="0.01" onchange="recalcTotal()">
         </div>
       </div>
 
@@ -549,7 +549,7 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
         <div class="total-line"><span>Subtotal platos:</span><span id="tSubPlatos">$0.00</span></div>
         <div class="total-line"><span>Subtotal extras:</span><span id="tSubExtras">$0.00</span></div>
         <div class="total-line"><span>Descuento:</span><span id="tDescuento">-$0.00</span></div>
-        <div class="total-line"><span>Propina:</span><span id="tPropina">+$0.00</span></div>
+        <div class="total-line"><span>Delivery:</span><span id="tDelivery">+$0.00</span></div>
         <hr class="total-divider">
         <div class="total-final"><span>TOTAL:</span><span id="tTotal">$0.00</span></div>
       </div>
@@ -943,13 +943,13 @@ function recalcTotal() {
   });
 
   const descuento = Math.max(0, parseFloat(document.getElementById('descuento').value) || 0);
-  const propina   = Math.max(0, parseFloat(document.getElementById('propina').value)   || 0);
-  const total     = subPlatos + subExtras - descuento + propina;
+  const delivery  = Math.max(0, parseFloat(document.getElementById('delivery').value)   || 0);
+  const total     = subPlatos + subExtras - descuento + delivery;
 
   document.getElementById('tSubPlatos').textContent = fmt(subPlatos);
   document.getElementById('tSubExtras').textContent = fmt(subExtras);
   document.getElementById('tDescuento').textContent = '-' + fmt(descuento);
-  document.getElementById('tPropina').textContent   = '+' + fmt(propina);
+  document.getElementById('tDelivery').textContent   = '+' + fmt(delivery);
   document.getElementById('tTotal').textContent     = fmt(Math.max(0, total));
 }
 
@@ -1044,7 +1044,7 @@ async function submitPedido() {
       notas:     document.getElementById('notas').value || '',
       direccion: document.getElementById('direccion').value || '',
       descuento: parseFloat(document.getElementById('descuento').value) || 0,
-      propina:   parseFloat(document.getElementById('propina').value)   || 0,
+      delivery: parseFloat(document.getElementById('delivery').value) || 0,
     });
 
     const totalEl = document.getElementById('tTotal').textContent;
@@ -1081,7 +1081,7 @@ function resetPedidoForm() {
   document.getElementById('notas').value     = '';
   document.getElementById('direccion').value = '';
   document.getElementById('descuento').value = 0;
-  document.getElementById('propina').value   = 0;
+  document.getElementById('delivery').value = 0;
   recalcTotal();
 }
 
