@@ -165,7 +165,8 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 }
 
 .item-row.collapsible.show {
-  max-height: 300px; opacity: 1; padding: 12px;
+  /* FIX APP-DROP: overflow visible para que el dropdown no quede recortado */
+  overflow: visible; max-height: 300px; opacity: 1; padding: 12px;
   margin-bottom: 10px; border-width: 1.5px;
 }
 
@@ -310,10 +311,11 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 }
 .ac-clear.visible { display: block; }
 .ac-dropdown {
-  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  /* FIX APP-DROP: position fixed para escapar de overflow:hidden de contenedores */
+  position: fixed;
   background: var(--white); border: 1.5px solid var(--orange);
   border-radius: 8px; max-height: 220px; overflow-y: auto;
-  z-index: 150; box-shadow: 0 4px 16px rgba(0,0,0,.12);
+  z-index: 500; box-shadow: 0 4px 16px rgba(0,0,0,.18);
   display: none;
 }
 .ac-dropdown.open { display: block; }
@@ -674,6 +676,10 @@ const acIndex = {};   // { key: number } — highlighted option index
 
 // ─── INIT ─────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
+  // FIX APP-DROP: reposicionar dropdown al hacer scroll
+  const contentEl = document.querySelector('.content');
+  if (contentEl) contentEl.addEventListener('scroll', _acReposition, { passive: true });
+
   if (WEBAPP_URL && API_TOKEN) {   // FIX R-01 (v10): requiere URL + token
     // FIX APP-10: ocultar banner desde el principio si ya hay URL
     const banner = document.getElementById('apiBanner');
@@ -1147,9 +1153,43 @@ async function submitCliente() {
 // AUTOCOMPLETE ENGINE
 // FIX APP-05: acSelect llama recalcTotal() al confirmar selección
 // FIX APP-11: debounce en acFilter (180ms)
+// FIX APP-DROP: dropdown con position:fixed — escapa de overflow:hidden
 // ═══════════════════════════════════════════════════════════════
 
 let acDebounceTimers = {};
+let acActiveKey = null;  // FIX APP-DROP: key del dropdown abierto actualmente
+
+// FIX APP-DROP: posicionar el dropdown usando coordenadas fijas de pantalla
+function _acPositionDrop(key) {
+  const input = document.getElementById(`acInput-${key}`);
+  const drop  = document.getElementById(`acDrop-${key}`);
+  if (!input || !drop) return;
+  const rect = input.getBoundingClientRect();
+  const spaceBelow = window.innerHeight - rect.bottom - 8;
+  const spaceAbove = rect.top - 8;
+  const dropH = Math.min(220, drop.scrollHeight || 220);
+
+  drop.style.left  = rect.left + 'px';
+  drop.style.width = rect.width + 'px';
+
+  if (spaceBelow >= Math.min(dropH, 120) || spaceBelow >= spaceAbove) {
+    // mostrar abajo
+    drop.style.top    = (rect.bottom + 4) + 'px';
+    drop.style.bottom = 'auto';
+    drop.style.maxHeight = Math.max(80, spaceBelow) + 'px';
+  } else {
+    // mostrar arriba
+    drop.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+    drop.style.top    = 'auto';
+    drop.style.maxHeight = Math.max(80, spaceAbove) + 'px';
+  }
+}
+
+// Reposicionar el dropdown activo al hacer scroll o resize
+function _acReposition() {
+  if (acActiveKey) _acPositionDrop(acActiveKey);
+}
+window.addEventListener('resize', _acReposition, { passive: true });
 
 function acInit(key, items) {
   acData[key]  = items;
@@ -1172,6 +1212,7 @@ function _acFilterNow(key) {
   if (!query) {
     drop.classList.remove('open');
     drop.innerHTML = '';
+    acActiveKey = null;
     return;
   }
 
@@ -1181,6 +1222,8 @@ function _acFilterNow(key) {
   if (matches.length === 0) {
     drop.innerHTML = `<div class="ac-empty">Sin resultados</div>`;
     drop.classList.add('open');
+    acActiveKey = key;
+    _acPositionDrop(key);  // FIX APP-DROP
     return;
   }
 
@@ -1194,6 +1237,8 @@ function _acFilterNow(key) {
       ${hl}</div>`;
   }).join('');
   drop.classList.add('open');
+  acActiveKey = key;
+  _acPositionDrop(key);  // FIX APP-DROP
 }
 
 // FIX APP-05: llama recalcTotal después de seleccionar
@@ -1213,6 +1258,7 @@ function acSelect(key, value) {
   drop.classList.remove('open');
   drop.innerHTML = '';
   acIndex[key] = -1;
+  acActiveKey = null;  // FIX APP-DROP
 
   // FIX APP-05: recalcular total inmediatamente al seleccionar
   recalcTotal();
@@ -1220,7 +1266,10 @@ function acSelect(key, value) {
 
 function acOpen(key) {
   const input = document.getElementById(`acInput-${key}`);
-  if (input.value) _acFilterNow(key);
+  if (input.value) {
+    _acFilterNow(key);
+    _acPositionDrop(key);  // FIX APP-DROP
+  }
 }
 
 function acClear(key) {
@@ -1236,6 +1285,7 @@ function acClear(key) {
   drop.classList.remove('open');
   drop.innerHTML = '';
   acIndex[key] = -1;
+  acActiveKey = null;  // FIX APP-DROP
   recalcTotal();
 }
 
@@ -1278,6 +1328,7 @@ document.addEventListener('click', e => {
     const wrap = drop.closest('.ac-wrap');
     if (wrap && !wrap.contains(e.target)) {
       drop.classList.remove('open');
+      acActiveKey = null;  // FIX APP-DROP
     }
   });
 });
