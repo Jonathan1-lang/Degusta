@@ -1053,8 +1053,12 @@ async function submitPedido() {
     const e3 = document.getElementById('extra3').value;
 
     // FIX APP-09: cantidades opcionales como número (0) en lugar de string ''
-    const result = await webappPost('pedido', {
-      cliente,
+    const uuid = (crypto.randomUUID
+        ? crypto.randomUUID()
+        : Date.now().toString(36) + Math.random().toString(36).slice(2));
+      const result = await webappPost('pedido', {
+        uuid,
+        cliente,
       plato1,
       cant1:  parseInt(document.getElementById('cantPlato1').value) || 1,
       plato2: p2 || '',
