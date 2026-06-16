@@ -4,1338 +4,909 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FF6B00">
 <title>Degusta</title>
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-/* Remove 300ms tap delay on Android Chrome */
-a, button, input, select, textarea, [onclick], [ontouchend] {
-  touch-action: manipulation;
-}
-
-:root {
-  --orange: #FF6B00;
-  --orange-dark: #E55A00;
-  --white: #FFFFFF;
-  --gray-light: #F5F5F5;
-  --gray-mid: #E0E0E0;
-  --gray-text: #666;
-  --green: #2E7D32;
-  --green-bg: #E8F5E9;
-  --red: #C62828;
-  --red-bg: #FFEBEE;
-  --yellow: #F57F17;
-  --yellow-bg: #FFFDE7;
-  --header-h: 56px;
-  --tabs-h: 60px;
-}
-
-html, body {
-  height: 100%;
-  background: #ECECEC;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 16px;
-  color: #222;
-}
-
-.app {
-  max-width: 480px;
-  margin: 0 auto;
-  min-height: 100%;
-  background: var(--white);
-  position: relative;
-  display: flex;
-  flex-direction: column;
-}
-
-/* HEADER */
-.header {
-  position: fixed;
-  top: 0; left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 480px;
-  height: var(--header-h);
-  background: var(--orange);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  z-index: 100;
-  box-shadow: 0 2px 6px rgba(0,0,0,.2);
-}
-
-.header-title { color: var(--white); font-size: 22px; font-weight: 700; letter-spacing: .5px; }
-.header-status { font-size: 13px; color: rgba(255,255,255,.85); margin-left: 8px; }
-
-.btn-settings {
-  background: rgba(255,255,255,.2); border: 2px solid rgba(255,255,255,.6);
-  color: var(--white); font-size: 24px; cursor: pointer;
-  padding: 10px 14px; border-radius: 10px;
-  transition: background .2s; line-height: 1; min-width: 48px; min-height: 48px;
-  display: flex; align-items: center; justify-content: center;
-}
-.btn-settings:hover { background: rgba(255,255,255,.35); }
-
-/* MAIN CONTENT */
-.content {
-  margin-top: var(--header-h);
-  margin-bottom: var(--tabs-h);
-  flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.tab-panel { display: none; padding: 16px; padding-bottom: 24px; }
-.tab-panel.active { display: block; }
-
-/* BOTTOM TABS */
-.tabs {
-  position: fixed;
-  bottom: 0; left: 50%;
-  transform: translateX(-50%);
-  width: 100%; max-width: 480px;
-  height: var(--tabs-h);
-  background: var(--white);
-  border-top: 1px solid var(--gray-mid);
-  display: flex; z-index: 100;
-  box-shadow: 0 -2px 8px rgba(0,0,0,.08);
-}
-
-.tab-btn {
-  flex: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  border: none; background: none; cursor: pointer;
-  color: var(--gray-text); font-size: 11px; font-weight: 500;
-  gap: 3px; transition: color .2s; padding: 6px 0;
-}
-.tab-btn .tab-icon { font-size: 20px; }
-.tab-btn.active { color: var(--orange); }
-
-/* FORM ELEMENTS */
-.form-section {
-  background: var(--gray-light);
-  border-radius: 12px; padding: 14px; margin-bottom: 14px;
-}
-
-.section-title {
-  font-size: 13px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .6px;
-  color: var(--gray-text); margin-bottom: 12px;
-}
-
-.field { margin-bottom: 12px; }
-.field:last-child { margin-bottom: 0; }
-
-label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 5px; }
-label .req { color: var(--orange); }
-
-input[type=text], input[type=date], input[type=time],
-input[type=number], select, textarea {
-  width: 100%; padding: 12px;
-  border: 1.5px solid var(--gray-mid);
-  border-radius: 8px; font-size: 16px;
-  background: var(--white); color: #222;
-  appearance: none; -webkit-appearance: none;
-  outline: none; transition: border-color .2s;
-}
-input:focus, select:focus, textarea:focus { border-color: var(--orange); }
-
-select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px;
-}
-
-textarea { min-height: 80px; resize: vertical; }
-input[type=number] { -moz-appearance: textfield; }
-input[type=number]::-webkit-outer-spin-button,
-input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
-
-/* ITEM ROWS */
-.item-row {
-  background: var(--white); border-radius: 10px; padding: 12px;
-  margin-bottom: 10px; border: 1.5px solid var(--gray-mid); position: relative;
-}
-
-.item-row.collapsible {
-  overflow: hidden; max-height: 0; opacity: 0;
-  padding: 0 12px; margin-bottom: 0; border-width: 0;
-  transition: max-height .3s ease, opacity .3s ease, padding .3s ease,
-              margin-bottom .3s ease, border-width .3s ease;
-}
-
-.item-row.collapsible.show {
-  /* FIX APP-DROP: overflow visible para que el dropdown no quede recortado */
-  overflow: visible; max-height: 300px; opacity: 1; padding: 12px;
-  margin-bottom: 10px; border-width: 1.5px;
-}
-
-.item-header {
-  display: flex; align-items: center;
-  justify-content: space-between; margin-bottom: 8px;
-}
-.item-label { font-size: 13px; font-weight: 600; color: #555; }
-
-.btn-remove {
-  background: none; border: none; color: var(--red);
-  font-size: 20px; cursor: pointer; padding: 2px 6px;
-  line-height: 1; border-radius: 4px;
-}
-.btn-remove:hover { background: var(--red-bg); }
-
-.row-2col {
-  display: grid; grid-template-columns: 1fr 80px;
-  gap: 8px; align-items: end;
-}
-
-.btn-add {
-  background: none; border: 1.5px dashed var(--orange);
-  color: var(--orange); border-radius: 8px; width: 100%;
-  padding: 10px; font-size: 14px; font-weight: 600;
-  cursor: pointer; margin-top: 4px; transition: background .2s;
-}
-.btn-add:hover { background: #FFF3E0; }
-
-/* TOTAL BOX */
-.total-box {
-  background: #FFF3E0; border: 2px solid var(--orange);
-  border-radius: 12px; padding: 14px; margin-bottom: 14px;
-}
-.total-box .total-title {
-  font-size: 13px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .6px; color: var(--orange); margin-bottom: 10px;
-}
-.total-line { display: flex; justify-content: space-between; font-size: 14px; color: #555; margin-bottom: 5px; }
-.total-divider { border: none; border-top: 1px solid var(--orange); margin: 8px 0; opacity: .4; }
-.total-final { display: flex; justify-content: space-between; font-size: 18px; font-weight: 700; color: var(--orange); }
-
-/* BUTTONS */
-.btn-submit {
-  width: 100%; height: 48px; background: var(--orange);
-  color: var(--white); border: none; border-radius: 10px;
-  font-size: 16px; font-weight: 700; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  gap: 8px; transition: background .2s, opacity .2s; margin-bottom: 8px;
-}
-.btn-submit:hover { background: var(--orange-dark); }
-.btn-submit:disabled { opacity: .5; cursor: not-allowed; }
-
-.spinner {
-  width: 18px; height: 18px;
-  border: 2px solid rgba(255,255,255,.4);
-  border-top-color: #fff; border-radius: 50%;
-  animation: spin .7s linear infinite; display: none;
-}
-.spinner.visible { display: block; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* MESSAGES */
-.msg { padding: 12px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 12px; display: none; line-height: 1.4; }
-.msg.show { display: block; }
-.msg.success { background: var(--green-bg); color: var(--green); border: 1px solid #A5D6A7; }
-.msg.error   { background: var(--red-bg);   color: var(--red);   border: 1px solid #EF9A9A; }
-.msg.warning { background: var(--yellow-bg);color: var(--yellow);border: 1px solid #FFF176; }
-
-/* LOADING OVERLAY */
-.loading-overlay {
-  display: none; align-items: center; justify-content: center;
-  flex-direction: column; gap: 14px; padding: 60px 20px; text-align: center;
-}
-.loading-overlay.show { display: flex; }
-.loading-spinner-lg {
-  width: 40px; height: 40px;
-  border: 4px solid var(--gray-mid); border-top-color: var(--orange);
-  border-radius: 50%; animation: spin .8s linear infinite;
-}
-.loading-text { color: var(--gray-text); font-size: 15px; }
-
-/* MODAL */
-.modal-overlay {
-  display: none; position: fixed; inset: 0;
-  background: rgba(0,0,0,.5); z-index: 200;
-  align-items: center; justify-content: center; padding: 20px;
-}
-.modal-overlay.show { display: flex; }
-.modal {
-  background: var(--white); border-radius: 16px; padding: 24px;
-  width: 100%; max-width: 420px; box-shadow: 0 8px 32px rgba(0,0,0,.2);
-}
-.modal-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
-.modal-sub   { font-size: 13px; color: var(--gray-text); margin-bottom: 18px; }
-.modal-status {
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 12px; border-radius: 8px; background: var(--gray-light);
-  font-size: 14px; margin-bottom: 14px; font-weight: 500;
-}
-.modal-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
-
-.btn-modal-primary {
-  height: 44px; background: var(--orange); color: var(--white);
-  border: none; border-radius: 8px; font-size: 15px; font-weight: 700;
-  cursor: pointer; transition: background .2s;
-}
-.btn-modal-primary:hover { background: var(--orange-dark); }
-
-.btn-modal-secondary {
-  height: 44px; background: none; color: var(--orange);
-  border: 1.5px solid var(--orange); border-radius: 8px;
-  font-size: 15px; font-weight: 600; cursor: pointer; transition: background .2s;
-}
-.btn-modal-secondary:hover { background: #FFF3E0; }
-
-.btn-modal-close {
-  height: 40px; background: none; color: var(--gray-text);
-  border: 1.5px solid var(--gray-mid); border-radius: 8px;
-  font-size: 14px; cursor: pointer;
-}
-.btn-retry {
-  margin-top: 12px; padding: 10px 24px; background: var(--orange);
-  color: white; border: none; border-radius: 8px;
-  font-size: 15px; font-weight: 600; cursor: pointer;
-}
-
-/* AUTOCOMPLETE */
-.ac-wrap { position: relative; }
-.ac-input {
-  width: 100%; padding: 12px 36px 12px 12px;
-  border: 1.5px solid var(--gray-mid); border-radius: 8px;
-  font-size: 16px; background: var(--white); color: #222;
-  outline: none; transition: border-color .2s;
-}
-.ac-input:focus { border-color: var(--orange); }
-.ac-input.has-value { border-color: var(--orange); background: #FFF8F3; }
-.ac-clear {
-  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-  background: none; border: none; color: #aaa; font-size: 18px;
-  cursor: pointer; line-height: 1; padding: 4px; display: none;
-}
-.ac-clear.visible { display: block; }
-.ac-dropdown {
-  /* FIX APP-DROP: position fixed para escapar de overflow:hidden de contenedores */
-  position: fixed;
-  background: var(--white); border: 1.5px solid var(--orange);
-  border-radius: 8px; max-height: 220px; overflow-y: auto;
-  z-index: 500; box-shadow: 0 4px 16px rgba(0,0,0,.18);
-  display: none;
-}
-.ac-dropdown.open { display: block; }
-.ac-option {
-  padding: 12px 14px; font-size: 15px; cursor: pointer;
-  border-bottom: 1px solid var(--gray-light); transition: background .15s;
-}
-.ac-option:last-child { border-bottom: none; }
-.ac-option:hover, .ac-option.highlighted { background: #FFF3E0; color: var(--orange); }
-.ac-option em { font-style: normal; font-weight: 700; color: var(--orange); }
-.ac-empty { padding: 12px 14px; font-size: 14px; color: var(--gray-text); }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+a,button,input,select,textarea,[onclick],[ontouchend]{touch-action:manipulation}
+:root{--or:#FF6B00;--or2:#E55A00;--bg:#111;--bg2:#1A1A1A;--bg3:#222;--bg4:#2C2C2C;--bdr:#333;--bdr2:#404040;--tx:#F0F0F0;--tx2:#AAA;--tx3:#666;--gr:#22C55E;--rd:#EF4444;--yw:#F59E0B;--hdr:56px;--tab:62px}
+html,body{height:100%;background:#0A0A0A;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:16px;color:var(--tx)}
+.app{max-width:480px;margin:0 auto;min-height:100%;background:var(--bg);position:relative;display:flex;flex-direction:column}
+.hdr{position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;height:var(--hdr);background:linear-gradient(135deg,#FF6B00,#E55A00);display:flex;align-items:center;justify-content:space-between;padding:0 16px;z-index:100;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+.hdr-title{color:#fff;font-size:22px;font-weight:800;letter-spacing:.5px}
+.hdr-st{font-size:12px;color:rgba(255,255,255,.85);margin-left:8px;background:rgba(0,0,0,.2);padding:3px 9px;border-radius:99px}
+.hdr-cfg{background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.5);color:#fff;font-size:22px;cursor:pointer;padding:8px 12px;border-radius:10px;line-height:1;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center}
+.tabs{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;height:var(--tab);background:var(--bg2);border-top:1px solid var(--bdr);display:flex;z-index:100;box-shadow:0 -4px 16px rgba(0,0,0,.4)}
+.tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border:none;background:none;cursor:pointer;color:var(--tx3);font-size:10px;font-weight:600;gap:3px;transition:color .2s;padding:6px 0;text-transform:uppercase;letter-spacing:.3px}
+.tab-btn .ico{font-size:22px}
+.tab-btn.active{color:var(--or)}
+.content{margin-top:var(--hdr);margin-bottom:var(--tab);flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.panel{display:none;padding:14px;padding-bottom:28px}
+.panel.active{display:block}
+.card{background:var(--bg3);border:1px solid var(--bdr);border-radius:14px;padding:14px;margin-bottom:12px}
+.card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--tx3);margin-bottom:12px}
+.field{margin-bottom:11px}.field:last-child{margin-bottom:0}
+label{display:block;font-size:13px;font-weight:600;color:var(--tx2);margin-bottom:5px}
+label .req{color:var(--or)}
+input[type=text],input[type=number],select,textarea{width:100%;padding:12px;border:1.5px solid var(--bdr2);border-radius:10px;font-size:15px;background:var(--bg4);color:var(--tx);appearance:none;-webkit-appearance:none;outline:none;transition:border-color .2s}
+input:focus,select:focus,textarea:focus{border-color:var(--or)}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px;background-color:var(--bg4)}
+select option{background:var(--bg3)}
+textarea{min-height:76px;resize:vertical}
+input[type=number]{-moz-appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+.irow{background:var(--bg4);border-radius:10px;padding:12px;margin-bottom:10px;border:1px solid var(--bdr2);position:relative}
+.irow.coll{overflow:hidden;max-height:0;opacity:0;padding:0 12px;margin-bottom:0;border-width:0;transition:max-height .3s,opacity .3s,padding .3s,margin-bottom .3s,border-width .3s}
+.irow.coll.show{overflow:visible;max-height:280px;opacity:1;padding:12px;margin-bottom:10px;border-width:1px}
+.irow-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.irow-lbl{font-size:13px;font-weight:600;color:var(--tx2)}
+.btn-rm{background:none;border:none;color:var(--rd);font-size:20px;cursor:pointer;padding:2px 6px;line-height:1;border-radius:4px}
+.r2c{display:grid;grid-template-columns:1fr 76px;gap:8px;align-items:end}
+.btn-add{background:none;border:1.5px dashed var(--or);color:var(--or);border-radius:10px;width:100%;padding:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px}
+.btn-primary{width:100%;height:52px;background:var(--or);color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .2s;margin-bottom:8px}
+.btn-primary:hover{background:var(--or2)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.btn-sec{width:100%;height:46px;background:none;color:var(--or);border:1.5px solid var(--or);border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px}
+.btn-ghost{width:100%;height:42px;background:none;color:var(--tx2);border:1px solid var(--bdr2);border-radius:10px;font-size:14px;cursor:pointer;margin-bottom:8px}
+.spin{width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;display:none}
+.spin.on{display:block}
+@keyframes rot{to{transform:rotate(360deg)}}
+.msg{padding:12px 14px;border-radius:10px;font-size:14px;margin-bottom:12px;display:none;line-height:1.5;align-items:flex-start;gap:8px}
+.msg.on{display:flex}
+.msg.ok{background:#14532D;color:#86EFAC;border:1px solid #166534}
+.msg.er{background:#7F1D1D;color:#FCA5A5;border:1px solid #991B1B}
+.msg.wa{background:#78350F;color:#FCD34D;border:1px solid #92400E}
+.msg-x{background:none;border:none;color:inherit;font-size:18px;cursor:pointer;margin-left:auto;flex-shrink:0;line-height:1;padding:0 0 0 4px}
+.ld-overlay{display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:80px 20px;text-align:center}
+.ld-overlay.on{display:flex}
+.ld-big{width:44px;height:44px;border:4px solid var(--bdr2);border-top-color:var(--or);border-radius:50%;animation:rot .8s linear infinite}
+.ld-txt{color:var(--tx2);font-size:15px}
+.ac-wrap{position:relative}
+.ac-inp{width:100%;padding:12px 36px 12px 12px;border:1.5px solid var(--bdr2);border-radius:10px;font-size:15px;background:var(--bg4);color:var(--tx);outline:none;transition:border-color .2s}
+.ac-inp:focus{border-color:var(--or)}.ac-inp.sel{border-color:var(--or);background:rgba(255,107,0,.07)}
+.ac-x{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--tx3);font-size:18px;cursor:pointer;line-height:1;padding:4px;display:none}
+.ac-x.on{display:block}
+.ac-drop{position:fixed;background:var(--bg3);border:1.5px solid var(--or);border-radius:10px;max-height:220px;overflow-y:auto;z-index:500;box-shadow:0 8px 24px rgba(0,0,0,.6);display:none}
+.ac-drop.open{display:block}
+.ac-opt{padding:12px 14px;font-size:15px;cursor:pointer;border-bottom:1px solid var(--bdr);transition:background .15s;color:var(--tx)}
+.ac-opt:last-child{border-bottom:none}
+.ac-opt:hover,.ac-opt.hi{background:rgba(255,107,0,.15);color:var(--or)}
+.ac-opt em{font-style:normal;font-weight:700;color:var(--or)}
+.ac-empty{padding:12px 14px;font-size:14px;color:var(--tx3)}
+.order-card{background:var(--bg3);border:1px solid var(--bdr);border-radius:14px;padding:14px;margin-bottom:12px}
+.ocard-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.ocard-cli{font-size:17px;font-weight:700;color:var(--tx)}
+.ocard-hora{font-size:12px;color:var(--tx3)}
+.ocard-items{font-size:14px;color:var(--tx2);margin-bottom:8px;line-height:1.6}
+.ocard-nota{font-size:13px;color:var(--yw);background:rgba(245,158,11,.1);border-radius:8px;padding:8px 10px;margin-bottom:8px}
+.badge{display:inline-flex;align-items:center;font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;margin-bottom:8px}
+.b-prep{background:rgba(59,130,246,.2);color:#93C5FD}
+.b-cam{background:rgba(245,158,11,.2);color:#FCD34D}
+.b-ent{background:rgba(34,197,94,.2);color:#86EFAC}
+.b-can{background:rgba(239,68,68,.2);color:#FCA5A5}
+.btn-est{height:40px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;padding:0 14px;transition:all .2s}
+.btn-next{background:var(--or);color:#fff}
+.btn-ent{background:#22C55E;color:#fff}
+.conn-badge{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:8px 12px;border-radius:99px;margin-bottom:12px}
+.cb-ok{background:rgba(34,197,94,.15);color:#86EFAC;border:1px solid rgba(34,197,94,.3)}
+.cb-er{background:rgba(239,68,68,.15);color:#FCA5A5;border:1px solid rgba(239,68,68,.3)}
+.cb-wa{background:rgba(245,158,11,.15);color:#FCD34D;border:1px solid rgba(245,158,11,.3)}
+.prox{text-align:center;padding:40px 20px}
+.prox-ico{font-size:48px;margin-bottom:12px}
+.prox-ttl{font-size:18px;font-weight:700;color:var(--tx);margin-bottom:8px}
+.prox-sub{font-size:14px;color:var(--tx3);line-height:1.6}
+.empty{text-align:center;padding:60px 20px;color:var(--tx3)}
+.empty-ico{font-size:40px;margin-bottom:12px}
+code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
 </style>
 </head>
 <body>
 <div class="app">
 
-  <!-- HEADER -->
-  <header class="header">
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span class="header-title">🍽️ Degusta</span>
-      <span class="header-status" id="headerStatus">🔴 Sin configurar</span>
+<!-- HEADER -->
+<header class="hdr">
+  <div style="display:flex;align-items:center;gap:6px">
+    <span class="hdr-title">🍽 Degusta</span>
+    <span class="hdr-st" id="hdrSt">🔴 Sin config</span>
+  </div>
+  <button class="hdr-cfg" onclick="goTab('config')">⚙️</button>
+</header>
+
+<main class="content">
+
+<!-- TAB 1: PEDIDO -->
+<div class="panel active" id="panel-pedido">
+  <div id="msgPedido" class="msg"></div>
+
+  <!-- Setup Banner -->
+  <div id="setupBanner" class="card" style="border-color:var(--or)">
+    <div class="card-title" style="color:var(--or)">⚙️ Configurar app</div>
+    <p style="font-size:13px;color:var(--tx2);margin-bottom:12px">Ingresa la URL y token del script para activar Degusta.</p>
+    <div class="field">
+      <label>URL de la Web App</label>
+      <input type="text" id="cfgUrl0" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
     </div>
-    <button class="btn-settings" onclick="openSettings()">⚙️</button>
-  </header>
-
-  <!-- MAIN CONTENT -->
-  <main class="content">
-
-    <!-- LOADING OVERLAY -->
-    <div class="loading-overlay" id="loadingOverlay">
-      <div class="loading-spinner-lg"></div>
-      <p class="loading-text">Cargando catálogo...</p>
+    <div class="field">
+      <label>Token de acceso</label>
+      <input type="text" id="cfgTok0" placeholder="dgst-..." autocomplete="off">
     </div>
-
-    <!-- TAB 1: PEDIDO -->
-    <div class="tab-panel active" id="panel-pedido">
-      <div id="msgPedido" class="msg"></div>
-
-      <div id="apiBanner" style="background:#FFF3E0;border:2px solid var(--orange);border-radius:12px;padding:16px;margin-bottom:14px;">
-        <div style="font-weight:700;font-size:15px;margin-bottom:4px;">⚙️ Web App URL</div>
-        <div style="font-size:13px;color:#888;margin-bottom:10px;">Pega la URL de la Web App del script y el token de acceso para activar la app</div>
-        <input type="text" id="inlineApiKey" placeholder="https://script.google.com/macros/s/.../exec"
-          autocomplete="off" spellcheck="false"
-          style="width:100%;padding:12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:15px;margin-bottom:10px;background:white;">
-        <input type="password" id="inlineApiToken" placeholder="Token de acceso (CONFIG!B18)"
-          autocomplete="off" spellcheck="false"
-          style="width:100%;padding:12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:15px;margin-bottom:10px;background:white;">
-        <button onclick="saveInlineApiKey()"
-          style="background:var(--orange);color:white;border:none;border-radius:8px;padding:14px;font-size:16px;font-weight:700;cursor:pointer;width:100%;">
-          Guardar y cargar catálogo
-        </button>
-        <div id="inlineBannerMsg" style="margin-top:10px;font-size:13px;color:#C62828;display:none;"></div>
-      </div>
-
-      <div class="form-section">
-        <div class="section-title">🧑 Cliente</div>
-        <div class="field">
-          <label>Cliente <span class="req">*</span></label>
-          <div class="ac-wrap" id="acWrap-cliente">
-            <input class="ac-input" id="acInput-cliente" type="text" placeholder="Buscar cliente..."
-              autocomplete="off" oninput="acFilter('cliente')" onfocus="acOpen('cliente')" onkeydown="acKey(event,'cliente')">
-            <button class="ac-clear" id="acClear-cliente" onclick="acClear('cliente')">×</button>
-            <div class="ac-dropdown" id="acDrop-cliente"></div>
-          </div>
-          <input type="hidden" id="cliente">
-        </div>
-      </div>
-
-      <!-- PLATOS -->
-      <div class="form-section">
-        <div class="section-title">🍽️ Platos</div>
-        <div class="item-row" id="platoRow1">
-          <div class="item-header"><span class="item-label">Plato 1</span></div>
-          <div class="row-2col">
-            <div class="ac-wrap" id="acWrap-plato1">
-              <input class="ac-input" id="acInput-plato1" type="text" placeholder="Buscar plato..."
-                autocomplete="off" oninput="acFilter('plato1')" onfocus="acOpen('plato1')" onkeydown="acKey(event,'plato1')">
-              <button class="ac-clear" id="acClear-plato1" onclick="acClear('plato1')">×</button>
-              <div class="ac-dropdown" id="acDrop-plato1"></div>
-              <input type="hidden" id="plato1">
-            </div>
-            <div>
-              <label style="font-size:12px;">Cant.</label>
-              <input type="number" id="cantPlato1" value="1" min="1" onchange="recalcTotal()">
-            </div>
-          </div>
-        </div>
-
-        <div class="item-row collapsible" id="platoRow2">
-          <div class="item-header">
-            <span class="item-label">Plato 2</span>
-            <button class="btn-remove" onclick="removePlato(2)">×</button>
-          </div>
-          <div class="row-2col">
-            <div class="ac-wrap" id="acWrap-plato2">
-              <input class="ac-input" id="acInput-plato2" type="text" placeholder="Buscar plato..."
-                autocomplete="off" oninput="acFilter('plato2')" onfocus="acOpen('plato2')" onkeydown="acKey(event,'plato2')">
-              <button class="ac-clear" id="acClear-plato2" onclick="acClear('plato2')">×</button>
-              <div class="ac-dropdown" id="acDrop-plato2"></div>
-              <input type="hidden" id="plato2">
-            </div>
-            <div>
-              <label style="font-size:12px;">Cant.</label>
-              <input type="number" id="cantPlato2" value="1" min="1" onchange="recalcTotal()">
-            </div>
-          </div>
-        </div>
-
-        <div class="item-row collapsible" id="platoRow3">
-          <div class="item-header">
-            <span class="item-label">Plato 3</span>
-            <button class="btn-remove" onclick="removePlato(3)">×</button>
-          </div>
-          <div class="row-2col">
-            <div class="ac-wrap" id="acWrap-plato3">
-              <input class="ac-input" id="acInput-plato3" type="text" placeholder="Buscar plato..."
-                autocomplete="off" oninput="acFilter('plato3')" onfocus="acOpen('plato3')" onkeydown="acKey(event,'plato3')">
-              <button class="ac-clear" id="acClear-plato3" onclick="acClear('plato3')">×</button>
-              <div class="ac-dropdown" id="acDrop-plato3"></div>
-              <input type="hidden" id="plato3">
-            </div>
-            <div>
-              <label style="font-size:12px;">Cant.</label>
-              <input type="number" id="cantPlato3" value="1" min="1" onchange="recalcTotal()">
-            </div>
-          </div>
-        </div>
-        <button class="btn-add" id="btnAddPlato" onclick="addPlato()">+ Agregar plato</button>
-      </div>
-
-      <!-- EXTRAS -->
-      <div class="form-section">
-        <div class="section-title">✨ Extras</div>
-        <div class="item-row" id="extraRow1">
-          <div class="item-header"><span class="item-label">Extra 1 <span style="font-weight:400;color:#999;">(opcional)</span></span></div>
-          <div class="row-2col">
-            <div class="ac-wrap" id="acWrap-extra1">
-              <input class="ac-input" id="acInput-extra1" type="text" placeholder="Buscar extra..."
-                autocomplete="off" oninput="acFilter('extra1')" onfocus="acOpen('extra1')" onkeydown="acKey(event,'extra1')">
-              <button class="ac-clear" id="acClear-extra1" onclick="acClear('extra1')">×</button>
-              <div class="ac-dropdown" id="acDrop-extra1"></div>
-              <input type="hidden" id="extra1">
-            </div>
-            <div>
-              <label style="font-size:12px;">Cant.</label>
-              <input type="number" id="cantExtra1" value="1" min="1" onchange="recalcTotal()">
-            </div>
-          </div>
-        </div>
-
-        <div class="item-row collapsible" id="extraRow2">
-          <div class="item-header">
-            <span class="item-label">Extra 2</span>
-            <button class="btn-remove" onclick="removeExtra(2)">×</button>
-          </div>
-          <div class="row-2col">
-            <div class="ac-wrap" id="acWrap-extra2">
-              <input class="ac-input" id="acInput-extra2" type="text" placeholder="Buscar extra..."
-                autocomplete="off" oninput="acFilter('extra2')" onfocus="acOpen('extra2')" onkeydown="acKey(event,'extra2')">
-              <button class="ac-clear" id="acClear-extra2" onclick="acClear('extra2')">×</button>
-              <div class="ac-dropdown" id="acDrop-extra2"></div>
-              <input type="hidden" id="extra2">
-            </div>
-            <div>
-              <label style="font-size:12px;">Cant.</label>
-              <input type="number" id="cantExtra2" value="1" min="1" onchange="recalcTotal()">
-            </div>
-          </div>
-        </div>
-
-        <div class="item-row collapsible" id="extraRow3">
-          <div class="item-header">
-            <span class="item-label">Extra 3</span>
-            <button class="btn-remove" onclick="removeExtra(3)">×</button>
-          </div>
-          <div class="row-2col">
-            <div class="ac-wrap" id="acWrap-extra3">
-              <input class="ac-input" id="acInput-extra3" type="text" placeholder="Buscar extra..."
-                autocomplete="off" oninput="acFilter('extra3')" onfocus="acOpen('extra3')" onkeydown="acKey(event,'extra3')">
-              <button class="ac-clear" id="acClear-extra3" onclick="acClear('extra3')">×</button>
-              <div class="ac-dropdown" id="acDrop-extra3"></div>
-              <input type="hidden" id="extra3">
-            </div>
-            <div>
-              <label style="font-size:12px;">Cant.</label>
-              <input type="number" id="cantExtra3" value="1" min="1" onchange="recalcTotal()">
-            </div>
-          </div>
-        </div>
-        <button class="btn-add" id="btnAddExtra" onclick="addExtra()">+ Agregar extra</button>
-      </div>
-
-      <!-- PAGO Y ESTADO -->
-      <div class="form-section">
-        <div class="section-title">💳 Pago y estado</div>
-        <div class="field">
-          <label for="metodoPago">Método de pago <span class="req">*</span></label>
-          <select id="metodoPago"><option value="">— Selecciona —</option></select>
-        </div>
-        <div class="field">
-          <label for="estado">Estado <span class="req">*</span></label>
-          <select id="estado">
-            <option value="Pendiente" selected>Pendiente</option>
-            <option value="Preparando">Preparando</option>
-            <option value="En camino">En camino</option>
-            <option value="Entregado">Entregado</option>
-            <option value="Cancelado">Cancelado</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- DETALLES -->
-      <div class="form-section">
-        <div class="section-title">📝 Detalles adicionales</div>
-        <div class="field">
-          <label for="notas">Notas <span style="font-weight:400;color:#999;">(opcional)</span></label>
-          <textarea id="notas" placeholder="Instrucciones especiales, alergias..."></textarea>
-        </div>
-        <div class="field">
-          <label for="direccion">Dirección de entrega <span style="font-weight:400;color:#999;">(opcional)</span></label>
-          <input type="text" id="direccion" placeholder="Calle, número, referencias...">
-        </div>
-        <div class="field">
-          <label for="descuento">Descuento ($)</label>
-          <input type="number" id="descuento" value="0" min="0" step="0.01" onchange="recalcTotal()">
-        </div>
-        <div class="field">
-          <label for="delivery">Delivery ($)</label>
-          <input type="number" id="delivery" value="0" min="0" step="0.01" onchange="recalcTotal()">
-        </div>
-      </div>
-
-      <!-- TOTAL -->
-      <div class="total-box">
-        <div class="total-title">💰 Total estimado</div>
-        <div class="total-line"><span>Subtotal platos:</span><span id="tSubPlatos">$0.00</span></div>
-        <div class="total-line"><span>Subtotal extras:</span><span id="tSubExtras">$0.00</span></div>
-        <div class="total-line"><span>Descuento:</span><span id="tDescuento">-$0.00</span></div>
-        <div class="total-line"><span>Delivery:</span><span id="tDelivery">+$0.00</span></div>
-        <hr class="total-divider">
-        <div class="total-final"><span>TOTAL:</span><span id="tTotal">$0.00</span></div>
-      </div>
-
-      <button class="btn-submit" id="btnSubmitPedido" onclick="submitPedido()">
-        <span class="spinner" id="spinnerPedido"></span>
-        <span id="btnPedidoText">Registrar pedido</span>
-      </button>
-    </div>
-
-    <!-- TAB 2: CLIENTE -->
-    <div class="tab-panel" id="panel-cliente">
-      <div id="msgCliente" class="msg"></div>
-      <div class="form-section">
-        <div class="section-title">👤 Nuevo cliente</div>
-        <div class="field">
-          <label for="cliNombre">Nombre completo <span class="req">*</span></label>
-          <input type="text" id="cliNombre" placeholder="Nombre y referencias">
-        </div>
-        <div class="field">
-          <label for="cliTel">Teléfono <span style="font-weight:400;color:#999;">(opcional)</span></label>
-          <input type="text" id="cliTel" placeholder="+503 7000 0000">
-        </div>
-        <div class="field">
-          <label for="cliDir">Dirección <span style="font-weight:400;color:#999;">(opcional)</span></label>
-          <input type="text" id="cliDir" placeholder="Colonia, calle, número...">
-        </div>
-      </div>
-      <button class="btn-submit" id="btnSubmitCliente" onclick="submitCliente()">
-        <span class="spinner" id="spinnerCliente"></span>
-        <span id="btnClienteText">Registrar cliente</span>
-      </button>
-    </div>
-
-  </main>
-
-  <!-- BOTTOM TABS -->
-  <nav class="tabs">
-    <button class="tab-btn active" id="tab-pedido" onclick="switchTab('pedido')">
-      <span class="tab-icon">📦</span><span>Pedido</span>
+    <button class="btn-primary" onclick="saveConfig0()">
+      <span class="spin" id="spin0"></span>
+      <span id="spin0txt">Guardar y cargar catálogo</span>
     </button>
-    <button class="tab-btn" id="tab-cliente" onclick="switchTab('cliente')">
-      <span class="tab-icon">👤</span><span>Cliente</span>
-    </button>
-  </nav>
+    <div id="bannerMsg" class="msg er"></div>
+  </div>
 
+  <!-- Loading -->
+  <div class="ld-overlay" id="ldOver">
+    <div class="ld-big"></div>
+    <p class="ld-txt">Cargando catálogo...</p>
+  </div>
+
+  <!-- Form (hidden until catalog loaded) -->
+  <div id="pedidoForm" style="display:none">
+
+    <div class="card">
+      <div class="card-title">🧑 Cliente</div>
+      <div class="field">
+        <label>Cliente <span class="req">*</span></label>
+        <div class="ac-wrap" id="aw-cli">
+          <input class="ac-inp" id="ai-cli" type="text" placeholder="Buscar o escribir nombre..." autocomplete="off" oninput="acF('cli')" onfocus="acO('cli')" onkeydown="acK(event,'cli')">
+          <button class="ac-x" id="ax-cli" onclick="acC('cli')">×</button>
+          <div class="ac-drop" id="ad-cli"></div>
+        </div>
+        <input type="hidden" id="v-cli">
+      </div>
+    </div>
+
+    <!-- PLATOS -->
+    <div class="card">
+      <div class="card-title">🍽 Platos</div>
+      <div id="platoRow1" class="irow">
+        <div class="irow-hdr"><span class="irow-lbl">Plato 1</span></div>
+        <div class="r2c">
+          <div class="ac-wrap">
+            <input class="ac-inp" id="ai-p1" type="text" placeholder="Buscar plato..." autocomplete="off" oninput="acF('p1')" onfocus="acO('p1')" onkeydown="acK(event,'p1')">
+            <button class="ac-x" id="ax-p1" onclick="acC('p1')">×</button>
+            <div class="ac-drop" id="ad-p1"></div>
+            <input type="hidden" id="v-p1">
+          </div>
+          <div><label style="font-size:11px">Cant.</label><input type="number" id="cp1" value="1" min="1"></div>
+        </div>
+      </div>
+      <div id="platoRow2" class="irow coll">
+        <div class="irow-hdr"><span class="irow-lbl">Plato 2</span><button class="btn-rm" onclick="rmP(2)">×</button></div>
+        <div class="r2c">
+          <div class="ac-wrap">
+            <input class="ac-inp" id="ai-p2" type="text" placeholder="Buscar plato..." autocomplete="off" oninput="acF('p2')" onfocus="acO('p2')" onkeydown="acK(event,'p2')">
+            <button class="ac-x" id="ax-p2" onclick="acC('p2')">×</button>
+            <div class="ac-drop" id="ad-p2"></div>
+            <input type="hidden" id="v-p2">
+          </div>
+          <div><label style="font-size:11px">Cant.</label><input type="number" id="cp2" value="1" min="1"></div>
+        </div>
+      </div>
+      <div id="platoRow3" class="irow coll">
+        <div class="irow-hdr"><span class="irow-lbl">Plato 3</span><button class="btn-rm" onclick="rmP(3)">×</button></div>
+        <div class="r2c">
+          <div class="ac-wrap">
+            <input class="ac-inp" id="ai-p3" type="text" placeholder="Buscar plato..." autocomplete="off" oninput="acF('p3')" onfocus="acO('p3')" onkeydown="acK(event,'p3')">
+            <button class="ac-x" id="ax-p3" onclick="acC('p3')">×</button>
+            <div class="ac-drop" id="ad-p3"></div>
+            <input type="hidden" id="v-p3">
+          </div>
+          <div><label style="font-size:11px">Cant.</label><input type="number" id="cp3" value="1" min="1"></div>
+        </div>
+      </div>
+      <button class="btn-add" id="btnAddP" onclick="addP()">+ Agregar plato</button>
+    </div>
+
+    <!-- EXTRAS -->
+    <div class="card">
+      <div class="card-title">✨ Extras <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px">(opcional)</span></div>
+      <div id="extraRow1" class="irow">
+        <div class="irow-hdr"><span class="irow-lbl">Extra 1</span></div>
+        <div class="r2c">
+          <div class="ac-wrap">
+            <input class="ac-inp" id="ai-e1" type="text" placeholder="Buscar extra..." autocomplete="off" oninput="acF('e1')" onfocus="acO('e1')" onkeydown="acK(event,'e1')">
+            <button class="ac-x" id="ax-e1" onclick="acC('e1')">×</button>
+            <div class="ac-drop" id="ad-e1"></div>
+            <input type="hidden" id="v-e1">
+          </div>
+          <div><label style="font-size:11px">Cant.</label><input type="number" id="ce1" value="1" min="1"></div>
+        </div>
+      </div>
+      <div id="extraRow2" class="irow coll">
+        <div class="irow-hdr"><span class="irow-lbl">Extra 2</span><button class="btn-rm" onclick="rmE(2)">×</button></div>
+        <div class="r2c">
+          <div class="ac-wrap">
+            <input class="ac-inp" id="ai-e2" type="text" placeholder="Buscar extra..." autocomplete="off" oninput="acF('e2')" onfocus="acO('e2')" onkeydown="acK(event,'e2')">
+            <button class="ac-x" id="ax-e2" onclick="acC('e2')">×</button>
+            <div class="ac-drop" id="ad-e2"></div>
+            <input type="hidden" id="v-e2">
+          </div>
+          <div><label style="font-size:11px">Cant.</label><input type="number" id="ce2" value="1" min="1"></div>
+        </div>
+      </div>
+      <div id="extraRow3" class="irow coll">
+        <div class="irow-hdr"><span class="irow-lbl">Extra 3</span><button class="btn-rm" onclick="rmE(3)">×</button></div>
+        <div class="r2c">
+          <div class="ac-wrap">
+            <input class="ac-inp" id="ai-e3" type="text" placeholder="Buscar extra..." autocomplete="off" oninput="acF('e3')" onfocus="acO('e3')" onkeydown="acK(event,'e3')">
+            <button class="ac-x" id="ax-e3" onclick="acC('e3')">×</button>
+            <div class="ac-drop" id="ad-e3"></div>
+            <input type="hidden" id="v-e3">
+          </div>
+          <div><label style="font-size:11px">Cant.</label><input type="number" id="ce3" value="1" min="1"></div>
+        </div>
+      </div>
+      <button class="btn-add" id="btnAddE" onclick="addE()">+ Agregar extra</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">💳 Pago y estado</div>
+      <div class="field">
+        <label>Método de pago <span class="req">*</span></label>
+        <select id="fPago"><option value="">— Selecciona —</option></select>
+      </div>
+      <div class="field">
+        <label>Estado inicial</label>
+        <select id="fEstado"><option value="Preparando" selected>Preparando</option></select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📝 Detalles</div>
+      <div class="field">
+        <label>Nota <span style="font-weight:400;color:var(--tx3)">(opcional)</span></label>
+        <textarea id="fNota" placeholder="Instrucciones especiales, alergias..."></textarea>
+      </div>
+      <div class="field">
+        <label>Delivery ($)</label>
+        <input type="number" id="fDelivery" value="0" min="0" step="0.5">
+      </div>
+    </div>
+
+    <button class="btn-primary" id="btnPedido" onclick="submitPedido()">
+      <span class="spin" id="spinPed"></span>
+      <span id="spinPedTxt">🛒 Registrar pedido</span>
+    </button>
+
+  </div>
 </div>
 
-<!-- SETTINGS MODAL -->
-<div class="modal-overlay" id="modalSettings">
-  <div class="modal">
-    <div class="modal-title">⚙️ Configuración</div>
-    <div class="modal-sub">Ingresa la URL de la Web App del script. Se guarda en el dispositivo.</div>
-    <div class="modal-status" id="modalStatusBox">
-      <span id="modalStatusIcon">🔴</span>
-      <span id="modalStatusText">Sin URL configurada</span>
-    </div>
-    <div class="field">
-      <label for="apiKeyInput">URL de la Web App</label>
-      <input type="text" id="apiKeyInput" placeholder="https://script.google.com/macros/s/.../exec"
-        autocomplete="off" spellcheck="false">
-    </div>
-    <div class="field">
-      <label for="apiTokenInput">Token de acceso</label>
-      <input type="password" id="apiTokenInput" placeholder="Token (CONFIG!B18)"
-        autocomplete="off" spellcheck="false">
-    </div>
-    <div class="modal-actions">
-      <button class="btn-modal-primary" onclick="saveApiKey()">Guardar y cargar datos</button>
-      <button class="btn-modal-secondary" id="btnReloadCatalog" onclick="reloadCatalog()" style="display:none;">🔄 Recargar catálogo</button>
-      <button class="btn-modal-close" onclick="closeSettings()">Cerrar</button>
+<!-- TAB 2: COCINA -->
+<div class="panel" id="panel-cocina">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div style="font-size:18px;font-weight:700">🍳 Cocina</div>
+    <button style="background:none;color:var(--or);border:1.5px solid var(--or);border-radius:10px;padding:0 16px;height:38px;font-size:14px;font-weight:700;cursor:pointer" onclick="loadCocina()">↻ Recargar</button>
+  </div>
+  <div id="msgCocina" class="msg"></div>
+  <div id="cocinaCont">
+    <div class="prox">
+      <div class="prox-ico">🚧</div>
+      <div class="prox-ttl">Módulo próximamente</div>
+      <div class="prox-sub">El backend aún no soporta <code>?vista=cocina</code>.<br>La estructura está lista. Pulsa Recargar cuando el script v14 esté desplegado.</div>
     </div>
   </div>
 </div>
 
+<!-- TAB 3: REPARTIDOR -->
+<div class="panel" id="panel-repartidor">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div style="font-size:18px;font-weight:700">🛵 Repartidor</div>
+    <button style="background:none;color:var(--or);border:1.5px solid var(--or);border-radius:10px;padding:0 16px;height:38px;font-size:14px;font-weight:700;cursor:pointer" onclick="loadRepartidor()">↻ Recargar</button>
+  </div>
+  <div id="msgRepartidor" class="msg"></div>
+  <div id="repartidorCont">
+    <div class="prox">
+      <div class="prox-ico">🚧</div>
+      <div class="prox-ttl">Módulo próximamente</div>
+      <div class="prox-sub">El backend aún no soporta <code>?vista=repartidor</code>.<br>La estructura lista. Pulsa Recargar cuando el script v14 esté desplegado.</div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 4: CONFIG -->
+<div class="panel" id="panel-config">
+  <div style="font-size:18px;font-weight:700;margin-bottom:14px">⚙️ Configuración</div>
+  <div id="msgConfig" class="msg"></div>
+  <div class="card">
+    <div class="card-title">🔌 Conexión al backend</div>
+    <div id="connBadge" class="conn-badge cb-er">🔴 Sin configurar</div>
+    <div class="field">
+      <label>URL de la Web App</label>
+      <input type="text" id="cfgUrl" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="field">
+      <label>Token de acceso</label>
+      <input type="text" id="cfgTok" placeholder="dgst-..." autocomplete="off" spellcheck="false">
+    </div>
+    <button class="btn-primary" onclick="saveConfig()">
+      <span class="spin" id="spinCfg"></span>
+      <span id="spinCfgTxt">💾 Guardar y cargar datos</span>
+    </button>
+    <button class="btn-sec" id="btnReload" onclick="reloadCat()" style="display:none">🔄 Recargar catálogo</button>
+  </div>
+  <div class="card" id="cfgInfoCard" style="display:none">
+    <div class="card-title">📋 Catálogo activo</div>
+    <div id="cfgInfo" style="font-size:14px;color:var(--tx2);line-height:2"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">ℹ️ Acerca de</div>
+    <div style="font-size:13px;color:var(--tx3);line-height:2">
+      <div><strong style="color:var(--tx2)">App:</strong> Degusta v2.0</div>
+      <div><strong style="color:var(--tx2)">Diseño:</strong> Dark mode naranja</div>
+      <div><strong style="color:var(--tx2)">Datos:</strong> sessionStorage (se borra al cerrar)</div>
+      <div><strong style="color:var(--tx2)">Backend:</strong> Google Apps Script</div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<nav class="tabs">
+  <button class="tab-btn active" id="tab-pedido" onclick="goTab('pedido')"><span class="ico">🛒</span><span>Pedido</span></button>
+  <button class="tab-btn" id="tab-cocina" onclick="goTab('cocina')"><span class="ico">🍳</span><span>Cocina</span></button>
+  <button class="tab-btn" id="tab-repartidor" onclick="goTab('repartidor')"><span class="ico">🛵</span><span>Envíos</span></button>
+  <button class="tab-btn" id="tab-config" onclick="goTab('config')"><span class="ico">⚙️</span><span>Config</span></button>
+</nav>
+
+</div>
+
 <script>
-// ═══════════════════════════════════════════════════════════════
-// DEGUSTA — index.html
-// Correcciones aplicadas:
-//   APP-01: WEBAPP_URL ya no usa localStorage — solo sessionStorage
-//           (se borra al cerrar la pestaña; no persiste entre sesiones)
-//   APP-02: SHEET_ID eliminado del código fuente
-//   APP-03: removePlato/removeExtra rehecho — limpia TODOS los items
-//           >= n, no solo el n pedido, y recalcula platoCount/extraCount
-//           correctamente
-//   APP-05: acSelect llama recalcTotal() al elegir item del autocomplete
-//   APP-06: validateCantidad() valida entero >= 1 antes de submit
-//   APP-07: flag catalogLoading previene cargas concurrentes
-//   APP-09: cant2/3/cantE1-3 se envían como número o 0, nunca string ''
-//   APP-10: apiBanner se oculta en loadCatalog al inicio, no solo en éxito
-//   APP-11: debounce de 180ms en acFilter para evitar re-render en cada tecla
-//   APP-12: primer método de pago se pre-selecciona automáticamente
-//   APP-13: SHEET_ID eliminado (dead code + exposición de datos)
-//   APP-14: mensaje de éxito persiste 8s (era 5s) y tiene botón de cierre
-//   APP-15: fetch con AbortController — timeout de 20s en GET, 30s en POST
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// DEGUSTA v2.0 — JS Engine
+// Backend: plain string arrays from GAS endpoint
+// POST via GET+d param (CORS workaround for GAS)
+// ═══════════════════════════════════════════════════════
 
-// ─── CONSTANTES ───────────────────────────────────────────────
-// FIX APP-01/APP-02: sessionStorage en lugar de localStorage;
-// SHEET_ID eliminado del cliente.
-// FIX R-01 (v10): token de autenticación enviado como parámetro "t"
-// en cada request. Se guarda en sessionStorage igual que la URL.
-let WEBAPP_URL = sessionStorage.getItem('degusta_webapp_url') || '';
-let API_TOKEN  = sessionStorage.getItem('degusta_token') || '';
+const SS_URL = "dg_url";
+const SS_TOK = "dg_tok";
+let WURL = sessionStorage.getItem(SS_URL) || "";
+let WTOK = sessionStorage.getItem(SS_TOK) || "";
 
-// ─── ESTADO ───────────────────────────────────────────────────
-let catalogLoaded  = false;
-let catalogLoading = false;  // FIX APP-07: previene cargas concurrentes
-let platos     = [];
-let extras     = [];
-let clientes   = [];
-let metodosPago = [];
-let platoCount = 1;
-let extraCount = 1;
+let catLoaded = false, catLoading = false;
+let CAT_PLATOS = [], CAT_EXTRAS = [], CAT_CLIENTES = [], CAT_PAGOS = [], CAT_ESTADOS = [];
+let pCnt = 1, eCnt = 1;
 
-// ─── AUTOCOMPLETE STATE ───────────────────────────────────────
-const acData  = {};   // { key: [{label, value}] }
-const acIndex = {};   // { key: number } — highlighted option index
+// Autocomplete state
+const acD = {}, acI = {};
+let acActive = null, acTimers = {};
 
-// ─── INIT ─────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', () => {
-  // FIX APP-DROP: reposicionar dropdown al hacer scroll
-  const contentEl = document.querySelector('.content');
-  if (contentEl) contentEl.addEventListener('scroll', _acReposition, { passive: true });
-
-  if (WEBAPP_URL && API_TOKEN) {   // FIX R-01 (v10): requiere URL + token
-    // FIX APP-10: ocultar banner desde el principio si ya hay URL
-    const banner = document.getElementById('apiBanner');
-    if (banner) banner.style.display = 'none';
+// ─── INIT ────────────────────────────────────────────
+window.addEventListener("DOMContentLoaded", function() {
+  var content = document.querySelector(".content");
+  if (content) content.addEventListener("scroll", acRepos, {passive:true});
+  window.addEventListener("resize", acRepos, {passive:true});
+  document.addEventListener("click", acGlobalClose);
+  if (WURL && WTOK) {
+    hideBanner();
     loadCatalog();
+  } else {
+    showSetupBanner();
   }
+  updateCfgPanel();
 });
 
-// ─── TAB SWITCHING ────────────────────────────────────────────
-function switchTab(tab) {
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('panel-' + tab).classList.add('active');
-  document.getElementById('tab-'   + tab).classList.add('active');
+// ─── TAB NAVIGATION ──────────────────────────────────
+function goTab(t) {
+  document.querySelectorAll(".panel").forEach(function(p){ p.classList.remove("active"); });
+  document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.remove("active"); });
+  document.getElementById("panel-" + t).classList.add("active");
+  document.getElementById("tab-" + t).classList.add("active");
 }
 
-// ─── SETTINGS MODAL ───────────────────────────────────────────
-function openSettings() {
-  document.getElementById('apiKeyInput').value   = WEBAPP_URL;
-  document.getElementById('apiTokenInput').value = API_TOKEN;   // FIX R-01 (v10)
-  updateModalStatus();
-  document.getElementById('modalSettings').classList.add('show');
+// ─── MESSAGES ────────────────────────────────────────
+function showMsg(id, type, txt) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.className = "msg on " + type;
+  el.innerHTML = "<span>" + txt + "</span><button class=\"msg-x\" onclick=\"hideMsg('" + id + "')\">×</button>";
+  el.scrollIntoView({behavior:"smooth", block:"nearest"});
+  if (type === "ok") setTimeout(function(){ hideMsg(id); }, 9000);
 }
-function closeSettings() {
-  document.getElementById('modalSettings').classList.remove('show');
+function hideMsg(id) {
+  var el = document.getElementById(id);
+  if (el) { el.className = "msg"; el.innerHTML = ""; }
 }
 
-function updateModalStatus() {
-  const icon       = document.getElementById('modalStatusIcon');
-  const text       = document.getElementById('modalStatusText');
-  const headerSt   = document.getElementById('headerStatus');
-  const reloadBtn  = document.getElementById('btnReloadCatalog');
+// ─── SETUP BANNER ────────────────────────────────────
+function showSetupBanner() {
+  var b = document.getElementById("setupBanner");
+  if (b) b.style.display = "";
+  var f = document.getElementById("pedidoForm");
+  if (f) f.style.display = "none";
+  var lo = document.getElementById("ldOver");
+  if (lo) lo.classList.remove("on");
+}
+function hideBanner() {
+  var b = document.getElementById("setupBanner");
+  if (b) b.style.display = "none";
+}
 
-  if (catalogLoading) {
-    icon.textContent = '🟡'; text.textContent = 'Cargando catálogo...';
-    headerSt.textContent = '🟡 Cargando...';
-  } else if (catalogLoaded) {
-    icon.textContent = '🟢'; text.textContent = 'Catálogo cargado correctamente';
-    headerSt.textContent = '🟢 Listo';
-    reloadBtn.style.display = 'block';
+function saveConfig0() {
+  var url = document.getElementById("cfgUrl0").value.trim();
+  var tok = document.getElementById("cfgTok0").value.trim();
+  var msg = document.getElementById("bannerMsg");
+  msg.className = "msg";
+  if (!url) { msg.className = "msg on er"; msg.innerHTML = "⚠️ Ingresa la URL de la Web App"; return; }
+  if (!tok) { msg.className = "msg on er"; msg.innerHTML = "⚠️ Ingresa el token de acceso"; return; }
+  WURL = url; WTOK = tok;
+  sessionStorage.setItem(SS_URL, url);
+  sessionStorage.setItem(SS_TOK, tok);
+  hideBanner();
+  updateCfgPanel();
+  loadCatalog();
+}
+
+// ─── CONFIG PANEL ────────────────────────────────────
+function updateCfgPanel() {
+  var urlI = document.getElementById("cfgUrl");
+  var tokI = document.getElementById("cfgTok");
+  if (urlI) urlI.value = WURL;
+  if (tokI) tokI.value = WTOK;
+  var badge = document.getElementById("connBadge");
+  var reload = document.getElementById("btnReload");
+  var hdrSt = document.getElementById("hdrSt");
+  if (catLoading) {
+    if (badge) { badge.className = "conn-badge cb-wa"; badge.textContent = "🟡 Cargando..."; }
+    if (hdrSt) hdrSt.textContent = "🟡 Cargando";
+  } else if (catLoaded) {
+    if (badge) { badge.className = "conn-badge cb-ok"; badge.textContent = "🟢 Conectado"; }
+    if (reload) reload.style.display = "";
+    if (hdrSt) hdrSt.textContent = "🟢 Listo";
+    showCfgInfo();
   } else {
-    icon.textContent = '🔴';
-    text.textContent  = WEBAPP_URL ? 'Error al cargar catálogo' : 'Sin URL de Web App configurada';
-    headerSt.textContent = WEBAPP_URL ? '🔴 Error' : '🔴 Sin configurar';
-    reloadBtn.style.display = WEBAPP_URL ? 'block' : 'none';
+    var noUrl = !WURL;
+    if (badge) { badge.className = "conn-badge cb-er"; badge.textContent = noUrl ? "🔴 Sin configurar" : "🔴 Error de conexión"; }
+    if (hdrSt) hdrSt.textContent = noUrl ? "🔴 Sin config" : "🔴 Error";
+    if (reload && WURL) reload.style.display = "";
   }
 }
 
-// FIX APP-01: guardar en sessionStorage (se borra al cerrar pestaña)
-function saveApiKey() {
-  const val   = document.getElementById('apiKeyInput').value.trim();
-  const token = document.getElementById('apiTokenInput').value.trim();
-  if (!val)   { alert('Por favor ingresa la URL de la Web App.'); return; }
-  if (!token) { alert('Por favor ingresa el token de acceso.');   return; }
-  WEBAPP_URL = val;
-  API_TOKEN  = token;
-  sessionStorage.setItem('degusta_webapp_url', val);
-  sessionStorage.setItem('degusta_token', token);   // FIX R-01 (v10)
-  closeSettings();
+function showCfgInfo() {
+  var card = document.getElementById("cfgInfoCard");
+  var info = document.getElementById("cfgInfo");
+  if (!card || !info) return;
+  card.style.display = "";
+  info.innerHTML = "🍽 <strong>" + CAT_PLATOS.length + "</strong> platos &nbsp;·&nbsp; ✨ <strong>" + CAT_EXTRAS.length + "</strong> extras &nbsp;·&nbsp; 💳 <strong>" + CAT_PAGOS.length + "</strong> métodos de pago &nbsp;·&nbsp; 👤 <strong>" + CAT_CLIENTES.length + "</strong> clientes";
+}
+
+function saveConfig() {
+  var url = document.getElementById("cfgUrl").value.trim();
+  var tok = document.getElementById("cfgTok").value.trim();
+  if (!url || !tok) { showMsg("msgConfig","er","⚠️ Completa URL y token."); return; }
+  WURL = url; WTOK = tok;
+  sessionStorage.setItem(SS_URL, url);
+  sessionStorage.setItem(SS_TOK, tok);
+  hideMsg("msgConfig");
+  hideBanner();
   loadCatalog();
 }
 
-function saveInlineApiKey() {
-  const val   = document.getElementById('inlineApiKey').value.trim();
-  const token = document.getElementById('inlineApiToken').value.trim();
-  const msgEl = document.getElementById('inlineBannerMsg');
-  if (!val)   { msgEl.textContent = 'Ingresa la URL primero.';      msgEl.style.display = 'block'; return; }
-  if (!token) { msgEl.textContent = 'Ingresa el token de acceso.';  msgEl.style.display = 'block'; return; }
-  WEBAPP_URL = val;
-  API_TOKEN  = token;
-  sessionStorage.setItem('degusta_webapp_url', val);
-  sessionStorage.setItem('degusta_token', token);   // FIX R-01 (v10)
-  msgEl.style.display = 'none';
-  const banner = document.getElementById('apiBanner');
-  if (banner) banner.style.display = 'none';
-  loadCatalog();
+function reloadCat() { loadCatalog(); }
+
+// ─── API HELPERS ─────────────────────────────────────
+function fetchTO(url, opts, ms) {
+  var ctrl = new AbortController();
+  var t = setTimeout(function(){ ctrl.abort(); }, ms || 20000);
+  return fetch(url, Object.assign({}, opts, {signal: ctrl.signal}))
+    .then(function(r){ clearTimeout(t); return r; })
+    .catch(function(e){ clearTimeout(t); if (e.name === "AbortError") throw new Error("Tiempo de espera agotado."); throw e; });
 }
 
-function reloadCatalog() {
-  closeSettings();
-  loadCatalog();
+function apiGET(params) {
+  var u = new URL(WURL);
+  u.searchParams.set("t", WTOK);
+  if (params) Object.entries(params).forEach(function(kv){ u.searchParams.set(kv[0], kv[1]); });
+  return fetchTO(u.toString(), {}, 20000)
+    .then(function(r){ if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function(d){ if (d.ok === false) throw new Error(d.error || "Error desconocido"); return d; });
 }
 
-// ─── API HELPERS ──────────────────────────────────────────────
-// FIX APP-15: AbortController con timeout configurable
-async function fetchWithTimeout(url, options = {}, timeoutMs = 20000) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { ...options, signal: ctrl.signal });
-    clearTimeout(timer);
-    return res;
-  } catch (e) {
-    clearTimeout(timer);
-    if (e.name === 'AbortError') throw new Error('Tiempo de espera agotado. Intenta de nuevo.');
-    throw e;
-  }
+// GAS no acepta POST cross-origin desde github.io
+// Solución: enviar via GET con payload JSON en param "d"
+function apiPOST(accion, data) {
+  var u = new URL(WURL);
+  u.searchParams.set("t", WTOK);
+  u.searchParams.set("accion", accion);
+  var payload = Object.assign({accion: accion}, data);
+  u.searchParams.set("d", JSON.stringify(payload));
+  return fetchTO(u.toString(), {}, 30000)
+    .then(function(r){ if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function(d){ if (d.ok === false) throw new Error(d.error || "Error desconocido"); return d; });
 }
 
-async function webappGet(params = {}) {
-  const url = new URL(WEBAPP_URL);
-  url.searchParams.set('t', API_TOKEN);   // FIX R-01 (v10)
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetchWithTimeout(url.toString(), {}, 20000);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error || 'Error desconocido');
-  return data;
-}
-
-// FIX CORS: GAS bloquea POST cross-origin desde github.io.
-// Solución: enviar datos via GET con payload JSON en parámetro "d".
-// doGet en el script lee e.parameter.action y e.parameter.d.
-async function webappPost(action, data) {
-  const url = new URL(WEBAPP_URL);
-  url.searchParams.set('t', API_TOKEN);   // FIX R-01 (v10)
-  url.searchParams.set('action', action);
-  url.searchParams.set('d', JSON.stringify(data));
-  const res = await fetchWithTimeout(url.toString(), {}, 30000);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const result = await res.json();
-  if (!result.ok) throw new Error(result.error || 'Error desconocido');
-  return result;
-}
-
-// ─── CATALOG LOADING ──────────────────────────────────────────
-async function loadCatalog() {
-  if (!WEBAPP_URL) return;
-  // FIX APP-07: evitar cargas concurrentes
-  if (catalogLoading) return;
-
-  catalogLoading = true;
-  catalogLoaded  = false;
-  updateModalStatus();
-
-  const overlay = document.getElementById('loadingOverlay');
-  overlay.innerHTML = `<div class="loading-spinner-lg"></div><p class="loading-text">Cargando catálogo...</p>`;
-  overlay.classList.add('show');
-  document.getElementById('panel-pedido').style.display  = 'none';
-  document.getElementById('panel-cliente').style.display = 'none';
-
-  try {
-    const catalogo = await webappGet({ action: 'catalogo' });
-
-    platos = (catalogo.platos || []).map(p => ({
-      nombre:   p.nombre,
-      categoria: p.categoria || 'General',
-      precio:   parseFloat(p.precio) || 0
-    }));
-
-    extras = (catalogo.extras || []).map(e => ({
-      nombre: e.nombre,
-      precio: parseFloat(e.precio) || 0
-    }));
-
-    clientes    = (catalogo.clientes || []).filter(c => c && c.trim());
-    metodosPago = (catalogo.metodos  || ['Efectivo','Transferencia'])
-                    .filter(m => m && m.trim());
-
-    populateDropdowns();
-
-    catalogLoaded  = true;
-    catalogLoading = false;
-    updateModalStatus();
-
-    overlay.classList.remove('show');
-    document.getElementById('panel-pedido').style.display  = '';
-    document.getElementById('panel-cliente').style.display = '';
-
-    const banner = document.getElementById('apiBanner');
-    if (banner) banner.style.display = 'none';
-
-  } catch(e) {
-    catalogLoading = false;
-    catalogLoaded  = false;
-    updateModalStatus();
-
-    overlay.innerHTML = `
-      <div style="color:var(--red);font-size:15px;text-align:center;padding:20px;">
-        <div style="font-size:40px;margin-bottom:12px;">❌</div>
-        <strong>Error al cargar catálogo</strong><br>
-        <span style="font-size:13px;color:#888;margin-top:6px;display:block;">${e.message}</span>
-        <button class="btn-retry" onclick="retryLoad()">Reintentar</button>
-      </div>`;
-    overlay.classList.add('show');
-    document.getElementById('panel-pedido').style.display  = 'none';
-    document.getElementById('panel-cliente').style.display = 'none';
-  }
+// ─── CATALOG LOADING ─────────────────────────────────
+function loadCatalog() {
+  if (!WURL || !WTOK) return;
+  if (catLoading) return;
+  catLoading = true;
+  catLoaded = false;
+  updateCfgPanel();
+  var lo = document.getElementById("ldOver");
+  var pf = document.getElementById("pedidoForm");
+  if (lo) { lo.innerHTML = "<div class=\"ld-big\"></div><p class=\"ld-txt\">Cargando catálogo...</p>"; lo.classList.add("on"); }
+  if (pf) pf.style.display = "none";
+  apiGET()
+    .then(function(data) {
+      CAT_PLATOS  = (data.platos || []).map(function(s){ return s.trim(); }).filter(Boolean);
+      CAT_EXTRAS  = (data.extras || []).map(function(s){ return s.trim(); }).filter(Boolean);
+      CAT_PAGOS   = (data.metodosPago || data.metodos || ["Efectivo","Transferencia"]).map(function(s){ return s.trim(); }).filter(Boolean);
+      CAT_ESTADOS = (data.estados || ["Preparando","En camino","Entregado","Cancelado"]).map(function(s){ return s.trim(); }).filter(Boolean);
+      CAT_CLIENTES= (data.clientes || []).map(function(s){ return s.trim(); }).filter(Boolean);
+      populateForm();
+      catLoaded = true;
+      catLoading = false;
+      updateCfgPanel();
+      if (lo) lo.classList.remove("on");
+      if (pf) pf.style.display = "";
+      hideBanner();
+    })
+    .catch(function(e) {
+      catLoading = false;
+      catLoaded = false;
+      updateCfgPanel();
+      if (lo) {
+        lo.innerHTML = "<div style=\"color:#FCA5A5;text-align:center;padding:20px\"><div style=\"font-size:40px;margin-bottom:12px\">❌</div><strong>Error al cargar catálogo</strong><br><span style=\"font-size:13px;color:var(--tx3);display:block;margin-top:6px\">" + (e.message||"") + "</span><button onclick=\"retryLoad()\" style=\"margin-top:16px;padding:12px 24px;background:var(--or);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer\">Reintentar</button></div>";
+        lo.classList.add("on");
+      }
+      showMsg("msgConfig", "er", "❌ " + (e.message || "Error"));
+    });
 }
 
 function retryLoad() {
   loadCatalog();
 }
 
-// ─── POPULATE DROPDOWNS ───────────────────────────────────────
-function populateDropdowns() {
-  // Métodos de pago
-  const pagoSel = document.getElementById('metodoPago');
-  pagoSel.innerHTML = '<option value="">— Selecciona —</option>';
-  metodosPago.forEach((m, i) => {
-    const opt = document.createElement('option');
-    opt.value = m; opt.textContent = m;
-    // FIX APP-12: pre-seleccionar primer método de pago
-    if (i === 0) opt.selected = true;
-    pagoSel.appendChild(opt);
+// ─── POPULATE FORM ───────────────────────────────────
+function populateForm() {
+  // Payment methods
+  var pSel = document.getElementById("fPago");
+  pSel.innerHTML = "<option value=\"\">— Selecciona —</option>";
+  CAT_PAGOS.forEach(function(m, i) {
+    var o = document.createElement("option");
+    o.value = m; o.textContent = m;
+    if (i === 0) o.selected = true;
+    pSel.appendChild(o);
   });
-
+  // Status options
+  var eSel = document.getElementById("fEstado");
+  eSel.innerHTML = "";
+  CAT_ESTADOS.forEach(function(s) {
+    var o = document.createElement("option");
+    o.value = s; o.textContent = s;
+    if (s === "Preparando") o.selected = true;
+    eSel.appendChild(o);
+  });
+  if (!eSel.value && CAT_ESTADOS.length) eSel.value = CAT_ESTADOS[0];
   // Autocompletes
-  acInit('cliente', clientes.map(c => ({ label: c, value: c })));
-
-  ['plato1','plato2','plato3'].forEach(id => {
-    acInit(id, platos.map(p => ({
-      label: p.nombre + (p.precio > 0 ? ` — $${p.precio.toFixed(2)}` : ''),
-      value: p.nombre
-    })));
-  });
-
-  ['extra1','extra2','extra3'].forEach(id => {
-    acInit(id, extras.map(e => ({
-      label: e.nombre + (e.precio > 0 ? ` — $${e.precio.toFixed(2)}` : ''),
-      value: e.nombre
-    })));
-  });
-
-  recalcTotal();
+  acInit("cli", CAT_CLIENTES.map(function(c){ return {label:c, value:c}; }));
+  ["p1","p2","p3"].forEach(function(k){ acInit(k, CAT_PLATOS.map(function(p){ return {label:p, value:p}; })); });
+  ["e1","e2","e3"].forEach(function(k){ acInit(k, CAT_EXTRAS.map(function(e){ return {label:e, value:e}; })); });
 }
 
-// ─── PLATO/EXTRA ADD/REMOVE ───────────────────────────────────
-function addPlato() {
-  if (platoCount >= 3) return;
-  platoCount++;
-  document.getElementById(`platoRow${platoCount}`).classList.add('show');
-  if (platoCount === 3) document.getElementById('btnAddPlato').style.display = 'none';
+// ─── PLATO/EXTRA ADD & REMOVE ────────────────────────
+function addP() {
+  if (pCnt >= 3) return;
+  pCnt++;
+  document.getElementById("platoRow" + pCnt).classList.add("show");
+  if (pCnt >= 3) document.getElementById("btnAddP").style.display = "none";
 }
-
-// FIX APP-03: limpia todos los platos >= n, recalcula platoCount correctamente
-function removePlato(n) {
-  for (let i = n; i <= 3; i++) {
-    acClear(`plato${i}`);
-    document.getElementById(`cantPlato${i}`).value = 1;
-    if (i > 1) document.getElementById(`platoRow${i}`).classList.remove('show');
+function rmP(n) {
+  for (var i = n; i <= 3; i++) {
+    acC("p" + i);
+    var cnt = document.getElementById("cp" + i);
+    if (cnt) cnt.value = 1;
+    if (i > 1) document.getElementById("platoRow" + i).classList.remove("show");
   }
-  platoCount = n - 1;
-  document.getElementById('btnAddPlato').style.display = '';
-  recalcTotal();
+  pCnt = n - 1;
+  document.getElementById("btnAddP").style.display = "";
 }
-
-function addExtra() {
-  if (extraCount >= 3) return;
-  extraCount++;
-  document.getElementById(`extraRow${extraCount}`).classList.add('show');
-  if (extraCount === 3) document.getElementById('btnAddExtra').style.display = 'none';
+function addE() {
+  if (eCnt >= 3) return;
+  eCnt++;
+  document.getElementById("extraRow" + eCnt).classList.add("show");
+  if (eCnt >= 3) document.getElementById("btnAddE").style.display = "none";
 }
-
-// FIX APP-03: ídem para extras
-function removeExtra(n) {
-  for (let i = n; i <= 3; i++) {
-    acClear(`extra${i}`);
-    document.getElementById(`cantExtra${i}`).value = 1;
-    if (i > 1) document.getElementById(`extraRow${i}`).classList.remove('show');
+function rmE(n) {
+  for (var i = n; i <= 3; i++) {
+    acC("e" + i);
+    var cnt = document.getElementById("ce" + i);
+    if (cnt) cnt.value = 1;
+    if (i > 1) document.getElementById("extraRow" + i).classList.remove("show");
   }
-  extraCount = n - 1;
-  document.getElementById('btnAddExtra').style.display = '';
-  recalcTotal();
+  eCnt = n - 1;
+  document.getElementById("btnAddE").style.display = "";
 }
 
-// ─── TOTAL CALCULATION ────────────────────────────────────────
-function getPrecioPlato(nombre) {
-  const p = platos.find(x => x.nombre === nombre);
-  return p ? p.precio : 0;
-}
-function getPrecioExtra(nombre) {
-  const e = extras.find(x => x.nombre === nombre);
-  return e ? e.precio : 0;
-}
-function fmt(n) { return '$' + n.toFixed(2); }
-
-function recalcTotal() {
-  let subPlatos = 0, subExtras = 0;
-  [1,2,3].forEach(i => {
-    const nombre = document.getElementById(`plato${i}`).value;
-    const cant   = Math.max(1, parseInt(document.getElementById(`cantPlato${i}`).value) || 1);
-    if (nombre) subPlatos += getPrecioPlato(nombre) * cant;
-  });
-  [1,2,3].forEach(i => {
-    const nombre = document.getElementById(`extra${i}`).value;
-    const cant   = Math.max(1, parseInt(document.getElementById(`cantExtra${i}`).value) || 1);
-    if (nombre) subExtras += getPrecioExtra(nombre) * cant;
-  });
-
-  const descuento = Math.max(0, parseFloat(document.getElementById('descuento').value) || 0);
-  const delivery  = Math.max(0, parseFloat(document.getElementById('delivery').value)   || 0);
-  const total     = subPlatos + subExtras - descuento + delivery;
-
-  document.getElementById('tSubPlatos').textContent = fmt(subPlatos);
-  document.getElementById('tSubExtras').textContent = fmt(subExtras);
-  document.getElementById('tDescuento').textContent = '-' + fmt(descuento);
-  document.getElementById('tDelivery').textContent   = '+' + fmt(delivery);
-  document.getElementById('tTotal').textContent     = fmt(Math.max(0, total));
-}
-
-// ─── MESSAGES ─────────────────────────────────────────────────
-// FIX APP-14: mensaje de éxito dura 8s y tiene botón ×
-function showMsg(id, type, text) {
-  const el = document.getElementById(id);
-  el.className = `msg ${type} show`;
-  if (type === 'success') {
-    el.innerHTML = `<span>${text}</span>
-      <button onclick="hideMsg('${id}')"
-        style="float:right;background:none;border:none;font-size:18px;cursor:pointer;color:inherit;margin-left:8px;">×</button>`;
+// ─── SUBMIT PEDIDO ───────────────────────────────────
+function submitPedido() {
+  if (!WURL || !WTOK) { showMsg("msgPedido","er","⚙️ Configura la URL y token primero."); return; }
+  if (!catLoaded) { showMsg("msgPedido","wa","⏳ Espera a que cargue el catálogo."); return; }
+  hideMsg("msgPedido");
+  var cliente = (document.getElementById("v-cli").value || document.getElementById("ai-cli").value || "").trim();
+  var plato1  = document.getElementById("v-p1").value;
+  var pago    = document.getElementById("fPago").value;
+  if (!cliente) { showMsg("msgPedido","er","⚠️ El nombre del cliente es requerido."); return; }
+  if (!plato1)  { showMsg("msgPedido","er","⚠️ Selecciona al menos el Plato 1."); return; }
+  if (!pago)    { showMsg("msgPedido","er","⚠️ Selecciona el método de pago."); return; }
+  var p2 = document.getElementById("v-p2").value;
+  var p3 = document.getElementById("v-p3").value;
+  var e1 = document.getElementById("v-e1").value;
+  var e2 = document.getElementById("v-e2").value;
+  var e3 = document.getElementById("v-e3").value;
+  function getN(id) { var v = parseInt(document.getElementById(id).value); return (isNaN(v) || v < 1) ? 1 : v; }
+  var uuid;
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    uuid = crypto.randomUUID();
   } else {
-    el.textContent = text;
+    uuid = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
   }
-  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  if (type === 'success') setTimeout(() => el.classList.remove('show'), 8000);
-}
-function hideMsg(id) {
-  document.getElementById(id).classList.remove('show');
-}
-
-// ─── VALIDACIÓN DE CANTIDADES ─────────────────────────────────
-// FIX APP-06: valida que las cantidades sean enteros >= 1
-function validateCantidades() {
-  const campos = [
-    'cantPlato1','cantPlato2','cantPlato3',
-    'cantExtra1','cantExtra2','cantExtra3'
-  ];
-  for (const id of campos) {
-    const val = parseInt(document.getElementById(id).value);
-    const plato = id.includes('Plato') ? document.getElementById(`plato${id.slice(-1)}`).value : null;
-    const extra = id.includes('Extra') ? document.getElementById(`extra${id.slice(-1)}`).value : null;
-    const tieneItem = plato || extra;
-    if (tieneItem && (isNaN(val) || val < 1)) {
-      return `Cantidad inválida en "${id.replace('cant','')}" — debe ser un número entero mayor a 0.`;
-    }
-  }
-  return null;
-}
-
-// ─── SUBMIT PEDIDO ────────────────────────────────────────────
-async function submitPedido() {
-  if (!WEBAPP_URL)    { alert('Configura la URL de la Web App primero (⚙️)'); return; }
-  if (!catalogLoaded) { alert('Espera a que cargue el catálogo.'); return; }
-
-  hideMsg('msgPedido');
-
-  const cliente    = document.getElementById('cliente').value;
-  const plato1     = document.getElementById('plato1').value;
-  const metodoPago = document.getElementById('metodoPago').value;
-
-  if (!cliente)    { showMsg('msgPedido','error','⚠️ Selecciona un cliente.');          return; }
-  if (!plato1)     { showMsg('msgPedido','error','⚠️ Selecciona al menos el Plato 1.'); return; }
-  if (!metodoPago) { showMsg('msgPedido','error','⚠️ Selecciona un método de pago.');   return; }
-
-  // FIX APP-06: validar cantidades
-  const cantErr = validateCantidades();
-  if (cantErr) { showMsg('msgPedido','error', '⚠️ ' + cantErr); return; }
-
-  const btn     = document.getElementById('btnSubmitPedido');
-  const spinner = document.getElementById('spinnerPedido');
-  const btnText = document.getElementById('btnPedidoText');
-  btn.disabled = true;
-  spinner.classList.add('visible');
-  btnText.textContent = 'Registrando...';
-
-  try {
-    const p2 = document.getElementById('plato2').value;
-    const p3 = document.getElementById('plato3').value;
-    const e1 = document.getElementById('extra1').value;
-    const e2 = document.getElementById('extra2').value;
-    const e3 = document.getElementById('extra3').value;
-
-    // FIX APP-09: cantidades opcionales como número (0) en lugar de string ''
-    const uuid = (crypto.randomUUID
-        ? crypto.randomUUID()
-        : Date.now().toString(36) + Math.random().toString(36).slice(2));
-      const result = await webappPost('pedido', {
-        uuid,
-        cliente,
-      plato1,
-      cant1:  parseInt(document.getElementById('cantPlato1').value) || 1,
-      plato2: p2 || '',
-      cant2:  p2 ? (parseInt(document.getElementById('cantPlato2').value) || 1) : 0,
-      plato3: p3 || '',
-      cant3:  p3 ? (parseInt(document.getElementById('cantPlato3').value) || 1) : 0,
-      extra1: e1 || '',
-      cantE1: e1 ? (parseInt(document.getElementById('cantExtra1').value) || 1) : 0,
-      extra2: e2 || '',
-      cantE2: e2 ? (parseInt(document.getElementById('cantExtra2').value) || 1) : 0,
-      extra3: e3 || '',
-      cantE3: e3 ? (parseInt(document.getElementById('cantExtra3').value) || 1) : 0,
-      pago:      metodoPago,
-      estado:    document.getElementById('estado').value || 'Pendiente',
-      notas:     document.getElementById('notas').value || '',
-      direccion: document.getElementById('direccion').value || '',
-      descuento: parseFloat(document.getElementById('descuento').value) || 0,
-      delivery: parseFloat(document.getElementById('delivery').value) || 0,
+  var payload = {
+    uuid: uuid,
+    accion: "pedido",
+    cliente: cliente,
+    plato1: plato1,       cant1: getN("cp1"),
+    plato2: p2 || "",     cant2: p2 ? getN("cp2") : 0,
+    plato3: p3 || "",     cant3: p3 ? getN("cp3") : 0,
+    extra1: e1 || "",     cantE1: e1 ? getN("ce1") : 0,
+    extra2: e2 || "",     cantE2: e2 ? getN("ce2") : 0,
+    extra3: e3 || "",     cantE3: e3 ? getN("ce3") : 0,
+    metodoPago: pago,
+    estado: document.getElementById("fEstado").value || "Preparando",
+    nota: document.getElementById("fNota").value.trim(),
+    delivery: parseFloat(document.getElementById("fDelivery").value) || 0
+  };
+  var btn = document.getElementById("btnPedido");
+  var sp  = document.getElementById("spinPed");
+  var txt = document.getElementById("spinPedTxt");
+  btn.disabled = true; sp.classList.add("on"); txt.textContent = "Registrando...";
+  apiPOST("pedido", payload)
+    .then(function(res) {
+      var idMsg = res.id ? " #" + res.id : "";
+      showMsg("msgPedido", "ok", "✅ Pedido" + idMsg + " registrado para " + cliente);
+      resetPedido();
+      if (cliente && CAT_CLIENTES.indexOf(cliente) < 0) {
+        CAT_CLIENTES.push(cliente);
+        acInit("cli", CAT_CLIENTES.map(function(c){ return {label:c, value:c}; }));
+      }
+    })
+    .catch(function(e) {
+      showMsg("msgPedido", "er", "❌ " + (e.message || "Error al registrar"));
+    })
+    .finally(function() {
+      btn.disabled = false; sp.classList.remove("on"); txt.textContent = "🛒 Registrar pedido";
     });
-
-    const totalEl = document.getElementById('tTotal').textContent;
-    showMsg('msgPedido','success', `✅ Pedido #${result.id} registrado — Total: ${totalEl}`);
-    resetPedidoForm();
-
-  } catch(e) {
-    showMsg('msgPedido','error', `❌ Error al registrar: ${e.message}`);
-  } finally {
-    btn.disabled = false;
-    spinner.classList.remove('visible');
-    btnText.textContent = 'Registrar pedido';
-  }
 }
 
-function resetPedidoForm() {
-  acClear('cliente');
-  [1,2,3].forEach(i => {
-    acClear(`plato${i}`);
-    document.getElementById(`cantPlato${i}`).value = 1;
-    acClear(`extra${i}`);
-    document.getElementById(`cantExtra${i}`).value = 1;
-  });
-  [2,3].forEach(i => {
-    document.getElementById(`platoRow${i}`).classList.remove('show');
-    document.getElementById(`extraRow${i}`).classList.remove('show');
-  });
-  platoCount = 1;
-  extraCount = 1;
-  document.getElementById('btnAddPlato').style.display = '';
-  document.getElementById('btnAddExtra').style.display = '';
-  // Mantener el método de pago pre-seleccionado (no limpiar)
-  document.getElementById('estado').value    = 'Pendiente';
-  document.getElementById('notas').value     = '';
-  document.getElementById('direccion').value = '';
-  document.getElementById('descuento').value = 0;
-  document.getElementById('delivery').value = 0;
-  recalcTotal();
+function resetPedido() {
+  acC("cli");
+  ["p1","p2","p3"].forEach(function(k) { acC(k); var el = document.getElementById("cp" + k[1]); if (el) el.value = 1; });
+  ["e1","e2","e3"].forEach(function(k) { acC(k); var el = document.getElementById("ce" + k[1]); if (el) el.value = 1; });
+  [2,3].forEach(function(i) { document.getElementById("platoRow"+i).classList.remove("show"); document.getElementById("extraRow"+i).classList.remove("show"); });
+  pCnt = 1; eCnt = 1;
+  document.getElementById("btnAddP").style.display = "";
+  document.getElementById("btnAddE").style.display = "";
+  document.getElementById("fNota").value = "";
+  document.getElementById("fDelivery").value = 0;
 }
 
-// ─── SUBMIT CLIENTE ───────────────────────────────────────────
-async function submitCliente() {
-  if (!WEBAPP_URL) { alert('Configura la URL de la Web App primero (⚙️)'); return; }
-  hideMsg('msgCliente');
-
-  const nombre = document.getElementById('cliNombre').value.trim();
-  const tel    = document.getElementById('cliTel').value.trim();
-  const dir    = document.getElementById('cliDir').value.trim();
-
-  if (!nombre) { showMsg('msgCliente','error','⚠️ El nombre es obligatorio.'); return; }
-
-  const btn     = document.getElementById('btnSubmitCliente');
-  const spinner = document.getElementById('spinnerCliente');
-  const btnText = document.getElementById('btnClienteText');
-  btn.disabled = true;
-  spinner.classList.add('visible');
-  btnText.textContent = 'Registrando...';
-
-  try {
-    const result = await webappPost('cliente', { nombre, telefono: tel, direccion: dir });
-    showMsg('msgCliente','success', `✅ Cliente "${nombre}" registrado correctamente.`);
-    document.getElementById('cliNombre').value = '';
-    document.getElementById('cliTel').value    = '';
-    document.getElementById('cliDir').value    = '';
-    // Actualizar lista de clientes en autocomplete
-    clientes.push(nombre);
-    acInit('cliente', clientes.map(c => ({ label: c, value: c })));
-  } catch(e) {
-    showMsg('msgCliente','error', `❌ Error al registrar: ${e.message}`);
-  } finally {
-    btn.disabled = false;
-    spinner.classList.remove('visible');
-    btnText.textContent = 'Registrar cliente';
-  }
+// ─── COCINA MODULE ───────────────────────────────────
+function loadCocina() {
+  if (!WURL || !WTOK) { showMsg("msgCocina","er","⚙️ Configura la conexión primero."); return; }
+  var cont = document.getElementById("cocinaCont");
+  cont.innerHTML = "<div style=\"padding:40px;text-align:center\"><div class=\"ld-big\" style=\"margin:0 auto\"></div><p style=\"color:var(--tx3);margin-top:12px\">Cargando...</p></div>";
+  apiGET({vista:"cocina"})
+    .then(function(data) {
+      if (!data.pedidos) { cont.innerHTML = proxHTML("cocina"); showMsg("msgCocina","wa","ℹ️ Backend aún no soporta vista=cocina"); return; }
+      var activos = data.pedidos.filter(function(p){ return p.estado !== "Entregado" && p.estado !== "Cancelado"; });
+      if (!activos.length) { cont.innerHTML = emptyHTML("✅","No hay pedidos activos"); return; }
+      cont.innerHTML = activos.map(function(p){ return renderCard(p, "cocina"); }).join("");
+    })
+    .catch(function(e) {
+      cont.innerHTML = proxHTML("cocina");
+      showMsg("msgCocina","wa","ℹ️ Backend no soporta vista=cocina aún");
+    });
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ─── REPARTIDOR MODULE ───────────────────────────────
+function loadRepartidor() {
+  if (!WURL || !WTOK) { showMsg("msgRepartidor","er","⚙️ Configura la conexión primero."); return; }
+  var cont = document.getElementById("repartidorCont");
+  cont.innerHTML = "<div style=\"padding:40px;text-align:center\"><div class=\"ld-big\" style=\"margin:0 auto\"></div><p style=\"color:var(--tx3);margin-top:12px\">Cargando...</p></div>";
+  apiGET({vista:"repartidor"})
+    .then(function(data) {
+      if (!data.pedidos) { cont.innerHTML = proxHTML("repartidor"); showMsg("msgRepartidor","wa","ℹ️ Backend aún no soporta vista=repartidor"); return; }
+      var enCamino = data.pedidos.filter(function(p){ return p.estado === "En camino"; });
+      if (!enCamino.length) { cont.innerHTML = emptyHTML("🎉","No hay envíos pendientes"); return; }
+      cont.innerHTML = enCamino.map(function(p){ return renderCard(p, "repartidor"); }).join("");
+    })
+    .catch(function(e) {
+      cont.innerHTML = proxHTML("repartidor");
+      showMsg("msgRepartidor","wa","ℹ️ Backend no soporta vista=repartidor aún");
+    });
+}
+
+function proxHTML(vista) {
+  var label = vista === "cocina" ? "vista=cocina" : "vista=repartidor";
+  return "<div class=\"prox\"><div class=\"prox-ico\">🚧</div><div class=\"prox-ttl\">Próximamente</div><div class=\"prox-sub\">El backend aún no soporta <code>?" + label + "</code>.<br>La estructura está lista. Pulsa Recargar cuando el script v14 esté desplegado.</div></div>";
+}
+function emptyHTML(ico, txt) {
+  return "<div class=\"empty\"><div class=\"empty-ico\">" + ico + "</div><div class=\"empty-txt\">" + txt + "</div></div>";
+}
+
+function esc(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+function badgeClass(est) {
+  if (est === "Preparando") return "b-prep";
+  if (est === "En camino") return "b-cam";
+  if (est === "Entregado") return "b-ent";
+  if (est === "Cancelado") return "b-can";
+  return "b-prep";
+}
+
+function renderCard(p, vista) {
+  var items = ["plato1","plato2","plato3"].map(function(k,i){
+    var n = p[k]; var c = p["cant"+(i+1)];
+    return n ? esc(n) + (c > 1 ? " ×"+c : "") : "";
+  }).filter(Boolean).join(", ");
+  var exs = ["extra1","extra2","extra3"].map(function(k,i){
+    var n = p[k]; var c = p["cantE"+(i+1)];
+    return n ? esc(n) + (c > 1 ? " ×"+c : "") : "";
+  }).filter(Boolean).join(", ");
+  var nextEst = p.estado === "Preparando" ? "En camino" : (p.estado === "En camino" ? "Entregado" : null);
+  var html = "<div class=\"order-card\">";
+  html += "<div class=\"ocard-hdr\"><span class=\"ocard-cli\">" + esc(p.cliente||"") + "</span><span class=\"ocard-hora\">" + esc(p.hora||p.timestamp||"") + "</span></div>";
+  html += "<span class=\"badge " + badgeClass(p.estado) + "\">" + esc(p.estado) + "</span>";
+  html += "<div class=\"ocard-items\">" + items + (exs ? "<br>+ " + exs : "") + "</div>";
+  if (p.nota) html += "<div class=\"ocard-nota\">📝 " + esc(p.nota) + "</div>";
+  if (p.metodoPago) html += "<div style=\"font-size:13px;color:var(--tx3);margin-bottom:8px\">💳 " + esc(p.metodoPago) + (p.delivery > 0 ? " · 🛵 $"+p.delivery : "") + "</div>";
+  if (vista === "cocina" && nextEst) html += "<button class=\"btn-est btn-next\" onclick=\"cambiarEstado('" + esc(p.uuid||"") + "','" + nextEst + "')\">&rarr; Marcar " + nextEst + "</button>";
+  if (vista === "repartidor" && p.estado === "En camino") html += "<button class=\"btn-est btn-ent\" onclick=\"cambiarEstado('" + esc(p.uuid||"") + "','Entregado')\">✅ Marcar entregado</button>";
+  html += "</div>";
+  return html;
+}
+
+function cambiarEstado(uuid, nuevoEstado) {
+  if (!confirm("¿Cambiar estado a \"" + nuevoEstado + "\"?")) return;
+  apiPOST("estado", {uuid: uuid, estado: nuevoEstado})
+    .then(function() {
+      var panel = document.querySelector(".panel.active");
+      if (panel && panel.id === "panel-cocina") loadCocina();
+      if (panel && panel.id === "panel-repartidor") loadRepartidor();
+    })
+    .catch(function(e) { alert("Error: " + (e.message||e)); });
+}
+
+// ═══════════════════════════════════════════════════════
 // AUTOCOMPLETE ENGINE
-// FIX APP-05: acSelect llama recalcTotal() al confirmar selección
-// FIX APP-11: debounce en acFilter (180ms)
-// FIX APP-DROP: dropdown con position:fixed — escapa de overflow:hidden
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+function acInit(key, items) { acD[key] = items; acI[key] = -1; }
 
-let acDebounceTimers = {};
-let acActiveKey = null;  // FIX APP-DROP: key del dropdown abierto actualmente
+function acRepos() { if (acActive) _acPos(acActive); }
 
-// FIX APP-DROP: posicionar el dropdown usando coordenadas fijas de pantalla
-function _acPositionDrop(key) {
-  const input = document.getElementById(`acInput-${key}`);
-  const drop  = document.getElementById(`acDrop-${key}`);
-  if (!input || !drop) return;
-  const rect = input.getBoundingClientRect();
-  const spaceBelow = window.innerHeight - rect.bottom - 8;
-  const spaceAbove = rect.top - 8;
-  const dropH = Math.min(220, drop.scrollHeight || 220);
-
-  drop.style.left  = rect.left + 'px';
-  drop.style.width = rect.width + 'px';
-
-  if (spaceBelow >= Math.min(dropH, 120) || spaceBelow >= spaceAbove) {
-    // mostrar abajo
-    drop.style.top    = (rect.bottom + 4) + 'px';
-    drop.style.bottom = 'auto';
-    drop.style.maxHeight = Math.max(80, spaceBelow) + 'px';
-  } else {
-    // mostrar arriba
-    drop.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
-    drop.style.top    = 'auto';
-    drop.style.maxHeight = Math.max(80, spaceAbove) + 'px';
-  }
-}
-
-// Reposicionar el dropdown activo al hacer scroll o resize
-function _acReposition() {
-  if (acActiveKey) _acPositionDrop(acActiveKey);
-}
-window.addEventListener('resize', _acReposition, { passive: true });
-
-function acInit(key, items) {
-  acData[key]  = items;
-  acIndex[key] = -1;
-}
-
-function acFilter(key) {
-  // FIX APP-11: debounce 180ms
-  clearTimeout(acDebounceTimers[key]);
-  acDebounceTimers[key] = setTimeout(() => _acFilterNow(key), 180);
-}
-
-function _acFilterNow(key) {
-  const input = document.getElementById(`acInput-${key}`);
-  const query = (input.value || '').toLowerCase().trim();
-  const drop  = document.getElementById(`acDrop-${key}`);
-  const items = acData[key] || [];
-
-  // Si no hay texto y el campo tiene valor guardado, no borrar la selección
-  if (!query) {
-    drop.classList.remove('open');
-    drop.innerHTML = '';
-    acActiveKey = null;
-    return;
-  }
-
-  const matches = items.filter(it => it.label.toLowerCase().includes(query));
-  acIndex[key]  = -1;
-
-  if (matches.length === 0) {
-    drop.innerHTML = `<div class="ac-empty">Sin resultados</div>`;
-    drop.classList.add('open');
-    acActiveKey = key;
-    _acPositionDrop(key);  // FIX APP-DROP
-    return;
-  }
-
-  drop.innerHTML = matches.map((it, i) => {
-    const hl = it.label.replace(
-      new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')', 'gi'),
-      '<em>$1</em>'
-    );
-    return `<div class="ac-option" data-value="${it.value}" data-idx="${i}"
-      onmousedown="acSelect('${key}','${it.value.replace(/'/g,"\\'")}')">
-      ${hl}</div>`;
-  }).join('');
-  drop.classList.add('open');
-  acActiveKey = key;
-  _acPositionDrop(key);  // FIX APP-DROP
-}
-
-// FIX APP-05: llama recalcTotal después de seleccionar
-function acSelect(key, value) {
-  const input  = document.getElementById(`acInput-${key}`);
-  const hidden = document.getElementById(key);
-  const clear  = document.getElementById(`acClear-${key}`);
-  const drop   = document.getElementById(`acDrop-${key}`);
-
-  // Mostrar el label (con precio) en el input visible, valor puro en hidden
-  const item = (acData[key] || []).find(it => it.value === value);
-  input.value  = item ? item.label : value;
-  hidden.value = value;
-
-  input.classList.add('has-value');
-  clear.classList.add('visible');
-  drop.classList.remove('open');
-  drop.innerHTML = '';
-  acIndex[key] = -1;
-  acActiveKey = null;  // FIX APP-DROP
-
-  // FIX APP-05: recalcular total inmediatamente al seleccionar
-  recalcTotal();
-}
-
-function acOpen(key) {
-  const input = document.getElementById(`acInput-${key}`);
-  if (input.value) {
-    _acFilterNow(key);
-    _acPositionDrop(key);  // FIX APP-DROP
-  }
-}
-
-function acClear(key) {
-  const input  = document.getElementById(`acInput-${key}`);
-  const hidden = document.getElementById(key);
-  const clear  = document.getElementById(`acClear-${key}`);
-  const drop   = document.getElementById(`acDrop-${key}`);
-
-  input.value  = '';
-  hidden.value = '';
-  input.classList.remove('has-value');
-  clear.classList.remove('visible');
-  drop.classList.remove('open');
-  drop.innerHTML = '';
-  acIndex[key] = -1;
-  acActiveKey = null;  // FIX APP-DROP
-  recalcTotal();
-}
-
-function acKey(event, key) {
-  const drop    = document.getElementById(`acDrop-${key}`);
-  const options = drop.querySelectorAll('.ac-option');
-
-  if (event.key === 'ArrowDown') {
-    event.preventDefault();
-    acIndex[key] = Math.min(acIndex[key] + 1, options.length - 1);
-    _acHighlight(options, acIndex[key]);
-  } else if (event.key === 'ArrowUp') {
-    event.preventDefault();
-    acIndex[key] = Math.max(acIndex[key] - 1, 0);
-    _acHighlight(options, acIndex[key]);
-  } else if (event.key === 'Enter') {
-    event.preventDefault();
-    if (acIndex[key] >= 0 && options[acIndex[key]]) {
-      const val = options[acIndex[key]].dataset.value;
-      acSelect(key, val);
-    } else if (options.length === 1) {
-      acSelect(key, options[0].dataset.value);
-    }
-  } else if (event.key === 'Escape') {
-    drop.classList.remove('open');
-  }
-}
-
-function _acHighlight(options, idx) {
-  options.forEach(o => o.classList.remove('highlighted'));
-  if (options[idx]) {
-    options[idx].classList.add('highlighted');
-    options[idx].scrollIntoView({ block: 'nearest' });
-  }
-}
-
-// Cerrar dropdown al hacer click fuera
-document.addEventListener('click', e => {
-  document.querySelectorAll('.ac-dropdown.open').forEach(drop => {
-    const wrap = drop.closest('.ac-wrap');
-    if (wrap && !wrap.contains(e.target)) {
-      drop.classList.remove('open');
-      acActiveKey = null;  // FIX APP-DROP
+function acGlobalClose(e) {
+  document.querySelectorAll(".ac-drop.open").forEach(function(d) {
+    var wrap = d.closest(".ac-wrap");
+    if (!wrap || !wrap.contains(e.target)) {
+      d.classList.remove("open");
+      if (acActive) acActive = null;
     }
   });
-});
+}
+
+function _acPos(key) {
+  var inp = document.getElementById("ai-" + key);
+  var drop = document.getElementById("ad-" + key);
+  if (!inp || !drop) return;
+  var r = inp.getBoundingClientRect();
+  var spDown = window.innerHeight - r.bottom - 8;
+  var spUp = r.top - 8;
+  drop.style.left = r.left + "px";
+  drop.style.width = r.width + "px";
+  if (spDown >= 80 || spDown >= spUp) {
+    drop.style.top = (r.bottom + 4) + "px";
+    drop.style.bottom = "auto";
+    drop.style.maxHeight = Math.max(80, spDown) + "px";
+  } else {
+    drop.style.bottom = (window.innerHeight - r.top + 4) + "px";
+    drop.style.top = "auto";
+    drop.style.maxHeight = Math.max(80, spUp) + "px";
+  }
+}
+
+function acF(key) {
+  clearTimeout(acTimers[key]);
+  acTimers[key] = setTimeout(function(){ _acFilter(key); }, 180);
+}
+
+function _acFilter(key) {
+  var inp = document.getElementById("ai-" + key);
+  var q = inp ? inp.value.toLowerCase().trim() : "";
+  var drop = document.getElementById("ad-" + key);
+  var items = acD[key] || [];
+  if (!q) { drop.classList.remove("open"); drop.innerHTML = ""; acActive = null; return; }
+  var matches = items.filter(function(it){ return it.label.toLowerCase().indexOf(q) >= 0; });
+  acI[key] = -1;
+  if (!matches.length) {
+    drop.innerHTML = "<div class=\"ac-empty\">Sin resultados</div>";
+  } else {
+    drop.innerHTML = matches.map(function(it) {
+      var hl = it.label.replace(new RegExp("(" + q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&") + ")","gi"), "<em>$1</em>");
+      return "<div class=\"ac-opt\" data-val=\"" + it.value.replace(/"/g,"&quot;") + "\" onmousedown=\"acSel('" + key + "','" + it.value.replace(/'/g,"&#39;") + "')\">" + hl + "</div>";
+    }).join("");
+  }
+  drop.classList.add("open");
+  acActive = key;
+  _acPos(key);
+}
+
+function acSel(key, val) {
+  var inp = document.getElementById("ai-" + key);
+  var hid = document.getElementById("v-" + key);
+  var clr = document.getElementById("ax-" + key);
+  var drop = document.getElementById("ad-" + key);
+  var item = (acD[key]||[]).find(function(it){ return it.value === val; });
+  if (inp) { inp.value = item ? item.label : val; inp.classList.add("sel"); }
+  if (hid) hid.value = val;
+  if (clr) clr.classList.add("on");
+  if (drop) { drop.classList.remove("open"); drop.innerHTML = ""; }
+  acI[key] = -1; acActive = null;
+}
+
+function acO(key) {
+  var inp = document.getElementById("ai-" + key);
+  if (inp && inp.value) { _acFilter(key); _acPos(key); }
+}
+
+function acC(key) {
+  var inp = document.getElementById("ai-" + key);
+  var hid = document.getElementById("v-" + key);
+  var clr = document.getElementById("ax-" + key);
+  var drop = document.getElementById("ad-" + key);
+  if (inp) { inp.value = ""; inp.classList.remove("sel"); }
+  if (hid) hid.value = "";
+  if (clr) clr.classList.remove("on");
+  if (drop) { drop.classList.remove("open"); drop.innerHTML = ""; }
+  acI[key] = -1; acActive = null;
+}
+
+function acK(e, key) {
+  var drop = document.getElementById("ad-" + key);
+  var opts = drop ? drop.querySelectorAll(".ac-opt") : [];
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    acI[key] = Math.min((acI[key]||0) + 1, opts.length - 1);
+    _acHi(opts, acI[key]);
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    acI[key] = Math.max((acI[key]||0) - 1, 0);
+    _acHi(opts, acI[key]);
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    if (acI[key] >= 0 && opts[acI[key]]) { acSel(key, opts[acI[key]].dataset.val); }
+    else if (opts.length === 1) { acSel(key, opts[0].dataset.val); }
+    else {
+      // Allow free-text for client field
+      if (e.target.value) {
+        var hid = document.getElementById("v-" + key);
+        if (hid) hid.value = e.target.value;
+        if (drop) { drop.classList.remove("open"); drop.innerHTML = ""; }
+      }
+    }
+  } else if (e.key === "Escape") {
+    if (drop) drop.classList.remove("open");
+  }
+}
+
+function _acHi(opts, idx) {
+  opts.forEach(function(o){ o.classList.remove("hi"); });
+  if (opts[idx]) { opts[idx].classList.add("hi"); opts[idx].scrollIntoView({block:"nearest"}); }
+}
 </script>
 </body>
 </html>
