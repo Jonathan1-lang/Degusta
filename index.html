@@ -844,7 +844,7 @@ function _acFilter(key) {
   var matches = items.filter(function(it){ return it.label.toLowerCase().indexOf(q) >= 0; });
   acI[key] = -1;
   if (!matches.length) {
-    if(key==="cli"&&inp&&inp.value.trim()){drop.innerHTML='<div class="ac-empty" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Sin resultados</span><button style="background:var(--or);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:700;cursor:pointer" onmousedown="abrirModalCliente(document.getElementById('ai-cli').value)">+ Nuevo</button></div>';}else{drop.innerHTML='<div class="ac-empty">Sin resultados</div>';}
+    if(key==="cli"&&inp&&inp.value.trim()){var qv=inp.value.trim().replace(/"/g,"&quot;");drop.innerHTML="<div class=\"ac-empty\" style=\"display:flex;align-items:center;justify-content:space-between;gap:8px\"><span>Sin resultados</span><button style=\"background:var(--or);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:700;cursor:pointer\" onmousedown=\"abrirModalCliente(&quot;"+qv+"&quot;)\">+ Nuevo</button></div>";}else{drop.innerHTML="<div class=\"ac-empty\">Sin resultados</div>";}
   } else {
     drop.innerHTML = matches.map(function(it) {
       var hl = it.label.replace(new RegExp("(" + q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&") + ")","gi"), "<em>$1</em>");
