@@ -98,6 +98,14 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 .empty{text-align:center;padding:60px 20px;color:var(--tx3)}
 .empty-ico{font-size:40px;margin-bottom:12px}
 code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
+
+/* Modal nuevo cliente */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:900;align-items:flex-end;justify-content:center}
+.modal-overlay.on{display:flex}
+.modal-box{background:var(--bg2);border-radius:18px 18px 0 0;padding:20px 16px 36px;width:100%;max-width:480px;border-top:2px solid var(--or);max-height:90vh;overflow-y:auto}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.modal-ttl{font-size:17px;font-weight:800;color:var(--tx)}
+.modal-x{background:none;border:none;color:var(--tx3);font-size:24px;cursor:pointer;line-height:1;padding:4px}
 </style>
 </head>
 <body>
@@ -106,10 +114,10 @@ code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
 <!-- HEADER -->
 <header class="hdr">
   <div style="display:flex;align-items:center;gap:6px">
-    <span class="hdr-title">🍽 Degusta</span>
-    <span class="hdr-st" id="hdrSt">🔴 Sin config</span>
+    <span class="hdr-title">ð½ Degusta</span>
+    <span class="hdr-st" id="hdrSt">ð´ Sin config</span>
   </div>
-  <button class="hdr-cfg" onclick="goTab('config')">⚙️</button>
+  <button class="hdr-cfg" onclick="goTab('config')">âï¸</button>
 </header>
 
 <main class="content">
@@ -120,7 +128,7 @@ code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
 
   <!-- Setup Banner -->
   <div id="setupBanner" class="card" style="border-color:var(--or)">
-    <div class="card-title" style="color:var(--or)">⚙️ Configurar app</div>
+    <div class="card-title" style="color:var(--or)">âï¸ Configurar app</div>
     <p style="font-size:13px;color:var(--tx2);margin-bottom:12px">Ingresa la URL y token del script para activar Degusta.</p>
     <div class="field">
       <label>URL de la Web App</label>
@@ -132,7 +140,7 @@ code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
     </div>
     <button class="btn-primary" onclick="saveConfig0()">
       <span class="spin" id="spin0"></span>
-      <span id="spin0txt">Guardar y cargar catálogo</span>
+      <span id="spin0txt">Guardar y cargar catÃ¡logo</span>
     </button>
     <div id="bannerMsg" class="msg er"></div>
   </div>
@@ -140,19 +148,19 @@ code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
   <!-- Loading -->
   <div class="ld-overlay" id="ldOver">
     <div class="ld-big"></div>
-    <p class="ld-txt">Cargando catálogo...</p>
+    <p class="ld-txt">Cargando catÃ¡logo...</p>
   </div>
 
   <!-- Form (hidden until catalog loaded) -->
   <div id="pedidoForm" style="display:none">
 
     <div class="card">
-      <div class="card-title">🧑 Cliente</div>
+      <div class="card-title">ð§ Cliente</div>
       <div class="field">
         <label>Cliente <span class="req">*</span></label>
         <div class="ac-wrap" id="aw-cli">
           <input class="ac-inp" id="ai-cli" type="text" placeholder="Buscar o escribir nombre..." autocomplete="off" oninput="acF('cli')" onfocus="acO('cli')" onkeydown="acK(event,'cli')">
-          <button class="ac-x" id="ax-cli" onclick="acC('cli')">×</button>
+          <button class="ac-x" id="ax-cli" onclick="acC('cli')">Ã</button>
           <div class="ac-drop" id="ad-cli"></div>
         </div>
         <input type="hidden" id="v-cli">
@@ -161,13 +169,13 @@ code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
 
     <!-- PLATOS -->
     <div class="card">
-      <div class="card-title">🍽 Platos</div>
+      <div class="card-title">ð½ Platos</div>
       <div id="platoRow1" class="irow">
         <div class="irow-hdr"><span class="irow-lbl">Plato 1</span></div>
         <div class="r2c">
           <div class="ac-wrap">
             <input class="ac-inp" id="ai-p1" type="text" placeholder="Buscar plato..." autocomplete="off" oninput="acF('p1')" onfocus="acO('p1')" onkeydown="acK(event,'p1')">
-            <button class="ac-x" id="ax-p1" onclick="acC('p1')">×</button>
+            <button class="ac-x" id="ax-p1" onclick="acC('p1')">Ã</button>
             <div class="ac-drop" id="ad-p1"></div>
             <input type="hidden" id="v-p1">
           </div>
@@ -175,11 +183,11 @@ code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
         </div>
       </div>
       <div id="platoRow2" class="irow coll">
-        <div class="irow-hdr"><span class="irow-lbl">Plato 2</span><button class="btn-rm" onclick="rmP(2)">×</button></div>
+        <div class="irow-hdr"><span class="irow-lbl">Plato 2</span><button class="btn-rm" onclick="rmP(2)">Ã</button></div>
         <div class="r2c">
           <div class="ac-wrap">
             <input class="ac-inp" id="ai-p2" type="text" placeholder="Buscar plato..." autocomplete="off" oninput="acF('p2')" onfocus="acO('p2')" onkeydown="acK(event,'p2')">
-            <button class="ac-x" id="ax-p2" onclick="acC('p2')">×</button>
+            <button class="ac-x" id="ax-p2" onclick="acC('p2')">Ã</button>
             <div class="ac-drop" id="ad-p2"></div>
             <input type="hidden" id="v-p2">
           </div>
@@ -187,11 +195,11 @@ code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
         </div>
       </div>
       <div id="platoRow3" class="irow coll">
-        <div class="irow-hdr"><span class="irow-lbl">Plato 3</span><button class="btn-rm" onclick="rmP(3)">×</button></div>
+        <div class="irow-hdr"><span class="irow-lbl">Plato 3</span><button class="btn-rm" onclick="rmP(3)">Ã</button></div>
         <div class="r2c">
           <div class="ac-wrap">
             <input class="ac-inp" id="ai-p3" type="text" placeholder="Buscar plato..." autocomplete="off" oninput="acF('p3')" onfocus="acO('p3')" onkeydown="acK(event,'p3')">
-            <button class="ac-x" id="ax-p3" onclick="acC('p3')">×</button>
+            <button class="ac-x" id="ax-p3" onclick="acC('p3')">Ã</button>
             <div class="ac-drop" id="ad-p3"></div>
             <input type="hidden" id="v-p3">
           </div>
@@ -203,13 +211,13 @@ code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
 
     <!-- EXTRAS -->
     <div class="card">
-      <div class="card-title">✨ Extras <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px">(opcional)</span></div>
+      <div class="card-title">â¨ Extras <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px">(opcional)</span></div>
       <div id="extraRow1" class="irow">
         <div class="irow-hdr"><span class="irow-lbl">Extra 1</span></div>
         <div class="r2c">
           <div class="ac-wrap">
             <input class="ac-inp" id="ai-e1" type="text" placeholder="Buscar extra..." autocomplete="off" oninput="acF('e1')" onfocus="acO('e1')" onkeydown="acK(event,'e1')">
-            <button class="ac-x" id="ax-e1" onclick="acC('e1')">×</button>
+            <button class="ac-x" id="ax-e1" onclick="acC('e1')">Ã</button>
             <div class="ac-drop" id="ad-e1"></div>
             <input type="hidden" id="v-e1">
           </div>
@@ -217,11 +225,11 @@ code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
         </div>
       </div>
       <div id="extraRow2" class="irow coll">
-        <div class="irow-hdr"><span class="irow-lbl">Extra 2</span><button class="btn-rm" onclick="rmE(2)">×</button></div>
+        <div class="irow-hdr"><span class="irow-lbl">Extra 2</span><button class="btn-rm" onclick="rmE(2)">Ã</button></div>
         <div class="r2c">
           <div class="ac-wrap">
             <input class="ac-inp" id="ai-e2" type="text" placeholder="Buscar extra..." autocomplete="off" oninput="acF('e2')" onfocus="acO('e2')" onkeydown="acK(event,'e2')">
-            <button class="ac-x" id="ax-e2" onclick="acC('e2')">×</button>
+            <button class="ac-x" id="ax-e2" onclick="acC('e2')">Ã</button>
             <div class="ac-drop" id="ad-e2"></div>
             <input type="hidden" id="v-e2">
           </div>
@@ -229,11 +237,11 @@ code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
         </div>
       </div>
       <div id="extraRow3" class="irow coll">
-        <div class="irow-hdr"><span class="irow-lbl">Extra 3</span><button class="btn-rm" onclick="rmE(3)">×</button></div>
+        <div class="irow-hdr"><span class="irow-lbl">Extra 3</span><button class="btn-rm" onclick="rmE(3)">Ã</button></div>
         <div class="r2c">
           <div class="ac-wrap">
             <input class="ac-inp" id="ai-e3" type="text" placeholder="Buscar extra..." autocomplete="off" oninput="acF('e3')" onfocus="acO('e3')" onkeydown="acK(event,'e3')">
-            <button class="ac-x" id="ax-e3" onclick="acC('e3')">×</button>
+            <button class="ac-x" id="ax-e3" onclick="acC('e3')">Ã</button>
             <div class="ac-drop" id="ad-e3"></div>
             <input type="hidden" id="v-e3">
           </div>
@@ -244,10 +252,10 @@ code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
     </div>
 
     <div class="card">
-      <div class="card-title">💳 Pago y estado</div>
+      <div class="card-title">ð³ Pago y estado</div>
       <div class="field">
-        <label>Método de pago <span class="req">*</span></label>
-        <select id="fPago"><option value="">— Selecciona —</option></select>
+        <label>MÃ©todo de pago <span class="req">*</span></label>
+        <select id="fPago"><option value="">â Selecciona â</option></select>
       </div>
       <div class="field">
         <label>Estado inicial</label>
@@ -256,7 +264,7 @@ code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
     </div>
 
     <div class="card">
-      <div class="card-title">📝 Detalles</div>
+      <div class="card-title">ð Detalles</div>
       <div class="field">
         <label>Nota <span style="font-weight:400;color:var(--tx3)">(opcional)</span></label>
         <textarea id="fNota" placeholder="Instrucciones especiales, alergias..."></textarea>
@@ -269,7 +277,7 @@ code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
 
     <button class="btn-primary" id="btnPedido" onclick="submitPedido()">
       <span class="spin" id="spinPed"></span>
-      <span id="spinPedTxt">🛒 Registrar pedido</span>
+      <span id="spinPedTxt">ð Registrar pedido</span>
     </button>
 
   </div>
@@ -278,15 +286,15 @@ code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
 <!-- TAB 2: COCINA -->
 <div class="panel" id="panel-cocina">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-    <div style="font-size:18px;font-weight:700">🍳 Cocina</div>
-    <button style="background:none;color:var(--or);border:1.5px solid var(--or);border-radius:10px;padding:0 16px;height:38px;font-size:14px;font-weight:700;cursor:pointer" onclick="loadCocina()">↻ Recargar</button>
+    <div style="font-size:18px;font-weight:700">ð³ Cocina</div>
+    <button style="background:none;color:var(--or);border:1.5px solid var(--or);border-radius:10px;padding:0 16px;height:38px;font-size:14px;font-weight:700;cursor:pointer" onclick="loadCocina()">â» Recargar</button>
   </div>
   <div id="msgCocina" class="msg"></div>
   <div id="cocinaCont">
     <div class="prox">
-      <div class="prox-ico">🚧</div>
-      <div class="prox-ttl">Módulo próximamente</div>
-      <div class="prox-sub">El backend aún no soporta <code>?vista=cocina</code>.<br>La estructura está lista. Pulsa Recargar cuando el script v14 esté desplegado.</div>
+      <div class="prox-ico">ð§</div>
+      <div class="prox-ttl">MÃ³dulo prÃ³ximamente</div>
+      <div class="prox-sub">El backend aÃºn no soporta <code>?vista=cocina</code>.<br>La estructura estÃ¡ lista. Pulsa Recargar cuando el script v14 estÃ© desplegado.</div>
     </div>
   </div>
 </div>
@@ -294,26 +302,26 @@ code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
 <!-- TAB 3: REPARTIDOR -->
 <div class="panel" id="panel-repartidor">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-    <div style="font-size:18px;font-weight:700">🛵 Repartidor</div>
-    <button style="background:none;color:var(--or);border:1.5px solid var(--or);border-radius:10px;padding:0 16px;height:38px;font-size:14px;font-weight:700;cursor:pointer" onclick="loadRepartidor()">↻ Recargar</button>
+    <div style="font-size:18px;font-weight:700">ðµ Repartidor</div>
+    <button style="background:none;color:var(--or);border:1.5px solid var(--or);border-radius:10px;padding:0 16px;height:38px;font-size:14px;font-weight:700;cursor:pointer" onclick="loadRepartidor()">â» Recargar</button>
   </div>
   <div id="msgRepartidor" class="msg"></div>
   <div id="repartidorCont">
     <div class="prox">
-      <div class="prox-ico">🚧</div>
-      <div class="prox-ttl">Módulo próximamente</div>
-      <div class="prox-sub">El backend aún no soporta <code>?vista=repartidor</code>.<br>La estructura lista. Pulsa Recargar cuando el script v14 esté desplegado.</div>
+      <div class="prox-ico">ð§</div>
+      <div class="prox-ttl">MÃ³dulo prÃ³ximamente</div>
+      <div class="prox-sub">El backend aÃºn no soporta <code>?vista=repartidor</code>.<br>La estructura lista. Pulsa Recargar cuando el script v14 estÃ© desplegado.</div>
     </div>
   </div>
 </div>
 
 <!-- TAB 4: CONFIG -->
 <div class="panel" id="panel-config">
-  <div style="font-size:18px;font-weight:700;margin-bottom:14px">⚙️ Configuración</div>
+  <div style="font-size:18px;font-weight:700;margin-bottom:14px">âï¸ ConfiguraciÃ³n</div>
   <div id="msgConfig" class="msg"></div>
   <div class="card">
-    <div class="card-title">🔌 Conexión al backend</div>
-    <div id="connBadge" class="conn-badge cb-er">🔴 Sin configurar</div>
+    <div class="card-title">ð ConexiÃ³n al backend</div>
+    <div id="connBadge" class="conn-badge cb-er">ð´ Sin configurar</div>
     <div class="field">
       <label>URL de la Web App</label>
       <input type="text" id="cfgUrl" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off" spellcheck="false">
@@ -324,19 +332,19 @@ code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
     </div>
     <button class="btn-primary" onclick="saveConfig()">
       <span class="spin" id="spinCfg"></span>
-      <span id="spinCfgTxt">💾 Guardar y cargar datos</span>
+      <span id="spinCfgTxt">ð¾ Guardar y cargar datos</span>
     </button>
-    <button class="btn-sec" id="btnReload" onclick="reloadCat()" style="display:none">🔄 Recargar catálogo</button>
+    <button class="btn-sec" id="btnReload" onclick="reloadCat()" style="display:none">ð Recargar catÃ¡logo</button>
   </div>
   <div class="card" id="cfgInfoCard" style="display:none">
-    <div class="card-title">📋 Catálogo activo</div>
+    <div class="card-title">ð CatÃ¡logo activo</div>
     <div id="cfgInfo" style="font-size:14px;color:var(--tx2);line-height:2"></div>
   </div>
   <div class="card">
-    <div class="card-title">ℹ️ Acerca de</div>
+    <div class="card-title">â¹ï¸ Acerca de</div>
     <div style="font-size:13px;color:var(--tx3);line-height:2">
       <div><strong style="color:var(--tx2)">App:</strong> Degusta v2.0</div>
-      <div><strong style="color:var(--tx2)">Diseño:</strong> Dark mode naranja</div>
+      <div><strong style="color:var(--tx2)">DiseÃ±o:</strong> Dark mode naranja</div>
       <div><strong style="color:var(--tx2)">Datos:</strong> sessionStorage (se borra al cerrar)</div>
       <div><strong style="color:var(--tx2)">Backend:</strong> Google Apps Script</div>
     </div>
@@ -346,20 +354,23 @@ code{background:var(--bg4);padding:2px 6px;border-radius:4px;font-size:13px}
 </main>
 
 <nav class="tabs">
-  <button class="tab-btn active" id="tab-pedido" onclick="goTab('pedido')"><span class="ico">🛒</span><span>Pedido</span></button>
-  <button class="tab-btn" id="tab-cocina" onclick="goTab('cocina')"><span class="ico">🍳</span><span>Cocina</span></button>
-  <button class="tab-btn" id="tab-repartidor" onclick="goTab('repartidor')"><span class="ico">🛵</span><span>Envíos</span></button>
-  <button class="tab-btn" id="tab-config" onclick="goTab('config')"><span class="ico">⚙️</span><span>Config</span></button>
+  <button class="tab-btn active" id="tab-pedido" onclick="goTab('pedido')"><span class="ico">ð</span><span>Pedido</span></button>
+  <button class="tab-btn" id="tab-cocina" onclick="goTab('cocina')"><span class="ico">ð³</span><span>Cocina</span></button>
+  <button class="tab-btn" id="tab-repartidor" onclick="goTab('repartidor')"><span class="ico">ðµ</span><span>EnvÃ­os</span></button>
+  <button class="tab-btn" id="tab-config" onclick="goTab('config')"><span class="ico">âï¸</span><span>Config</span></button>
 </nav>
 
+
+<!-- MODAL: Nuevo cliente -->
+<div class="modal-overlay" id="modalNuevoCli"><div class="modal-box"><div class="modal-hdr"><span class="modal-ttl">&#128100; Nuevo cliente</span><button class="modal-x" onclick="cerrarModalCliente()">&times;</button></div><div id="msgNuevoCli" class="msg" style="margin-bottom:12px"></div><div class="field"><label>Nombre <span class="req">*</span></label><input type="text" id="ncNombre" placeholder="Nombre completo..." autocomplete="off"></div><div class="field"><label>Telefono <span class="req">*</span></label><input type="text" id="ncTelefono" placeholder="+503 0000 0000" autocomplete="off"></div><div class="field"><label>Direccion <span class="req">*</span></label><input type="text" id="ncDireccion" placeholder="Direccion de entrega..." autocomplete="off"></div><div class="field"><label>Notas <span style="font-weight:400;color:var(--tx3)">(opcional)</span></label><textarea id="ncNotas" placeholder="Referencias..." style="min-height:60px"></textarea></div><button class="btn-primary" id="btnNuevoCli" onclick="submitNuevoCliente()"><span class="spin" id="spinNuevoCli"></span><span id="spinNuevaCliTxt">Guardar cliente</span></button></div></div>
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════
-// DEGUSTA v2.0 — JS Engine
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// DEGUSTA v2.0 â JS Engine
 // Backend: plain string arrays from GAS endpoint
 // POST via GET+d param (CORS workaround for GAS)
-// ═══════════════════════════════════════════════════════
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 const SS_URL = "dg_url";
 const SS_TOK = "dg_tok";
@@ -374,7 +385,7 @@ let pCnt = 1, eCnt = 1;
 const acD = {}, acI = {};
 let acActive = null, acTimers = {};
 
-// ─── INIT ────────────────────────────────────────────
+// âââ INIT ââââââââââââââââââââââââââââââââââââââââââââ
 window.addEventListener("DOMContentLoaded", function() {
   var content = document.querySelector(".content");
   if (content) content.addEventListener("scroll", acRepos, {passive:true});
@@ -389,7 +400,7 @@ window.addEventListener("DOMContentLoaded", function() {
   updateCfgPanel();
 });
 
-// ─── TAB NAVIGATION ──────────────────────────────────
+// âââ TAB NAVIGATION ââââââââââââââââââââââââââââââââââ
 function goTab(t) {
   document.querySelectorAll(".panel").forEach(function(p){ p.classList.remove("active"); });
   document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.remove("active"); });
@@ -397,12 +408,12 @@ function goTab(t) {
   document.getElementById("tab-" + t).classList.add("active");
 }
 
-// ─── MESSAGES ────────────────────────────────────────
+// âââ MESSAGES ââââââââââââââââââââââââââââââââââââââââ
 function showMsg(id, type, txt) {
   var el = document.getElementById(id);
   if (!el) return;
   el.className = "msg on " + type;
-  el.innerHTML = "<span>" + txt + "</span><button class=\"msg-x\" onclick=\"hideMsg('" + id + "')\">×</button>";
+  el.innerHTML = "<span>" + txt + "</span><button class=\"msg-x\" onclick=\"hideMsg('" + id + "')\">Ã</button>";
   el.scrollIntoView({behavior:"smooth", block:"nearest"});
   if (type === "ok") setTimeout(function(){ hideMsg(id); }, 9000);
 }
@@ -411,7 +422,7 @@ function hideMsg(id) {
   if (el) { el.className = "msg"; el.innerHTML = ""; }
 }
 
-// ─── SETUP BANNER ────────────────────────────────────
+// âââ SETUP BANNER ââââââââââââââââââââââââââââââââââââ
 function showSetupBanner() {
   var b = document.getElementById("setupBanner");
   if (b) b.style.display = "";
@@ -430,8 +441,8 @@ function saveConfig0() {
   var tok = document.getElementById("cfgTok0").value.trim();
   var msg = document.getElementById("bannerMsg");
   msg.className = "msg";
-  if (!url) { msg.className = "msg on er"; msg.innerHTML = "⚠️ Ingresa la URL de la Web App"; return; }
-  if (!tok) { msg.className = "msg on er"; msg.innerHTML = "⚠️ Ingresa el token de acceso"; return; }
+  if (!url) { msg.className = "msg on er"; msg.innerHTML = "â ï¸ Ingresa la URL de la Web App"; return; }
+  if (!tok) { msg.className = "msg on er"; msg.innerHTML = "â ï¸ Ingresa el token de acceso"; return; }
   WURL = url; WTOK = tok;
   sessionStorage.setItem(SS_URL, url);
   sessionStorage.setItem(SS_TOK, tok);
@@ -440,7 +451,7 @@ function saveConfig0() {
   loadCatalog();
 }
 
-// ─── CONFIG PANEL ────────────────────────────────────
+// âââ CONFIG PANEL ââââââââââââââââââââââââââââââââââââ
 function updateCfgPanel() {
   var urlI = document.getElementById("cfgUrl");
   var tokI = document.getElementById("cfgTok");
@@ -450,17 +461,17 @@ function updateCfgPanel() {
   var reload = document.getElementById("btnReload");
   var hdrSt = document.getElementById("hdrSt");
   if (catLoading) {
-    if (badge) { badge.className = "conn-badge cb-wa"; badge.textContent = "🟡 Cargando..."; }
-    if (hdrSt) hdrSt.textContent = "🟡 Cargando";
+    if (badge) { badge.className = "conn-badge cb-wa"; badge.textContent = "ð¡ Cargando..."; }
+    if (hdrSt) hdrSt.textContent = "ð¡ Cargando";
   } else if (catLoaded) {
-    if (badge) { badge.className = "conn-badge cb-ok"; badge.textContent = "🟢 Conectado"; }
+    if (badge) { badge.className = "conn-badge cb-ok"; badge.textContent = "ð¢ Conectado"; }
     if (reload) reload.style.display = "";
-    if (hdrSt) hdrSt.textContent = "🟢 Listo";
+    if (hdrSt) hdrSt.textContent = "ð¢ Listo";
     showCfgInfo();
   } else {
     var noUrl = !WURL;
-    if (badge) { badge.className = "conn-badge cb-er"; badge.textContent = noUrl ? "🔴 Sin configurar" : "🔴 Error de conexión"; }
-    if (hdrSt) hdrSt.textContent = noUrl ? "🔴 Sin config" : "🔴 Error";
+    if (badge) { badge.className = "conn-badge cb-er"; badge.textContent = noUrl ? "ð´ Sin configurar" : "ð´ Error de conexiÃ³n"; }
+    if (hdrSt) hdrSt.textContent = noUrl ? "ð´ Sin config" : "ð´ Error";
     if (reload && WURL) reload.style.display = "";
   }
 }
@@ -470,13 +481,13 @@ function showCfgInfo() {
   var info = document.getElementById("cfgInfo");
   if (!card || !info) return;
   card.style.display = "";
-  info.innerHTML = "🍽 <strong>" + CAT_PLATOS.length + "</strong> platos &nbsp;·&nbsp; ✨ <strong>" + CAT_EXTRAS.length + "</strong> extras &nbsp;·&nbsp; 💳 <strong>" + CAT_PAGOS.length + "</strong> métodos de pago &nbsp;·&nbsp; 👤 <strong>" + CAT_CLIENTES.length + "</strong> clientes";
+  info.innerHTML = "ð½ <strong>" + CAT_PLATOS.length + "</strong> platos &nbsp;Â·&nbsp; â¨ <strong>" + CAT_EXTRAS.length + "</strong> extras &nbsp;Â·&nbsp; ð³ <strong>" + CAT_PAGOS.length + "</strong> mÃ©todos de pago &nbsp;Â·&nbsp; ð¤ <strong>" + CAT_CLIENTES.length + "</strong> clientes";
 }
 
 function saveConfig() {
   var url = document.getElementById("cfgUrl").value.trim();
   var tok = document.getElementById("cfgTok").value.trim();
-  if (!url || !tok) { showMsg("msgConfig","er","⚠️ Completa URL y token."); return; }
+  if (!url || !tok) { showMsg("msgConfig","er","â ï¸ Completa URL y token."); return; }
   WURL = url; WTOK = tok;
   sessionStorage.setItem(SS_URL, url);
   sessionStorage.setItem(SS_TOK, tok);
@@ -487,7 +498,7 @@ function saveConfig() {
 
 function reloadCat() { loadCatalog(); }
 
-// ─── API HELPERS ─────────────────────────────────────
+// âââ API HELPERS âââââââââââââââââââââââââââââââââââââ
 function fetchTO(url, opts, ms) {
   var ctrl = new AbortController();
   var t = setTimeout(function(){ ctrl.abort(); }, ms || 20000);
@@ -506,7 +517,7 @@ function apiGET(params) {
 }
 
 // GAS no acepta POST cross-origin desde github.io
-// Solución: enviar via GET con payload JSON en param "d"
+// SoluciÃ³n: enviar via GET con payload JSON en param "d"
 function apiPOST(accion, data) {
   var u = new URL(WURL);
   u.searchParams.set("t", WTOK);
@@ -518,7 +529,7 @@ function apiPOST(accion, data) {
     .then(function(d){ if (d.ok === false) throw new Error(d.error || "Error desconocido"); return d; });
 }
 
-// ─── CATALOG LOADING ─────────────────────────────────
+// âââ CATALOG LOADING âââââââââââââââââââââââââââââââââ
 function loadCatalog() {
   if (!WURL || !WTOK) return;
   if (catLoading) return;
@@ -527,7 +538,7 @@ function loadCatalog() {
   updateCfgPanel();
   var lo = document.getElementById("ldOver");
   var pf = document.getElementById("pedidoForm");
-  if (lo) { lo.innerHTML = "<div class=\"ld-big\"></div><p class=\"ld-txt\">Cargando catálogo...</p>"; lo.classList.add("on"); }
+  if (lo) { lo.innerHTML = "<div class=\"ld-big\"></div><p class=\"ld-txt\">Cargando catÃ¡logo...</p>"; lo.classList.add("on"); }
   if (pf) pf.style.display = "none";
   apiGET()
     .then(function(data) {
@@ -549,10 +560,10 @@ function loadCatalog() {
       catLoaded = false;
       updateCfgPanel();
       if (lo) {
-        lo.innerHTML = "<div style=\"color:#FCA5A5;text-align:center;padding:20px\"><div style=\"font-size:40px;margin-bottom:12px\">❌</div><strong>Error al cargar catálogo</strong><br><span style=\"font-size:13px;color:var(--tx3);display:block;margin-top:6px\">" + (e.message||"") + "</span><button onclick=\"retryLoad()\" style=\"margin-top:16px;padding:12px 24px;background:var(--or);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer\">Reintentar</button></div>";
+        lo.innerHTML = "<div style=\"color:#FCA5A5;text-align:center;padding:20px\"><div style=\"font-size:40px;margin-bottom:12px\">â</div><strong>Error al cargar catÃ¡logo</strong><br><span style=\"font-size:13px;color:var(--tx3);display:block;margin-top:6px\">" + (e.message||"") + "</span><button onclick=\"retryLoad()\" style=\"margin-top:16px;padding:12px 24px;background:var(--or);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer\">Reintentar</button></div>";
         lo.classList.add("on");
       }
-      showMsg("msgConfig", "er", "❌ " + (e.message || "Error"));
+      showMsg("msgConfig", "er", "â " + (e.message || "Error"));
     });
 }
 
@@ -560,11 +571,11 @@ function retryLoad() {
   loadCatalog();
 }
 
-// ─── POPULATE FORM ───────────────────────────────────
+// âââ POPULATE FORM âââââââââââââââââââââââââââââââââââ
 function populateForm() {
   // Payment methods
   var pSel = document.getElementById("fPago");
-  pSel.innerHTML = "<option value=\"\">— Selecciona —</option>";
+  pSel.innerHTML = "<option value=\"\">â Selecciona â</option>";
   CAT_PAGOS.forEach(function(m, i) {
     var o = document.createElement("option");
     o.value = m; o.textContent = m;
@@ -587,7 +598,7 @@ function populateForm() {
   ["e1","e2","e3"].forEach(function(k){ acInit(k, CAT_EXTRAS.map(function(e){ return {label:e, value:e}; })); });
 }
 
-// ─── PLATO/EXTRA ADD & REMOVE ────────────────────────
+// âââ PLATO/EXTRA ADD & REMOVE ââââââââââââââââââââââââ
 function addP() {
   if (pCnt >= 3) return;
   pCnt++;
@@ -621,17 +632,17 @@ function rmE(n) {
   document.getElementById("btnAddE").style.display = "";
 }
 
-// ─── SUBMIT PEDIDO ───────────────────────────────────
+// âââ SUBMIT PEDIDO âââââââââââââââââââââââââââââââââââ
 function submitPedido() {
-  if (!WURL || !WTOK) { showMsg("msgPedido","er","⚙️ Configura la URL y token primero."); return; }
-  if (!catLoaded) { showMsg("msgPedido","wa","⏳ Espera a que cargue el catálogo."); return; }
+  if (!WURL || !WTOK) { showMsg("msgPedido","er","âï¸ Configura la URL y token primero."); return; }
+  if (!catLoaded) { showMsg("msgPedido","wa","â³ Espera a que cargue el catÃ¡logo."); return; }
   hideMsg("msgPedido");
   var cliente = (document.getElementById("v-cli").value || document.getElementById("ai-cli").value || "").trim();
   var plato1  = document.getElementById("v-p1").value;
   var pago    = document.getElementById("fPago").value;
-  if (!cliente) { showMsg("msgPedido","er","⚠️ El nombre del cliente es requerido."); return; }
-  if (!plato1)  { showMsg("msgPedido","er","⚠️ Selecciona al menos el Plato 1."); return; }
-  if (!pago)    { showMsg("msgPedido","er","⚠️ Selecciona el método de pago."); return; }
+  if (!cliente) { showMsg("msgPedido","er","â ï¸ El nombre del cliente es requerido."); return; }
+  if (!plato1)  { showMsg("msgPedido","er","â ï¸ Selecciona al menos el Plato 1."); return; }
+  if (!pago)    { showMsg("msgPedido","er","â ï¸ Selecciona el mÃ©todo de pago."); return; }
   var p2 = document.getElementById("v-p2").value;
   var p3 = document.getElementById("v-p3").value;
   var e1 = document.getElementById("v-e1").value;
@@ -666,7 +677,7 @@ function submitPedido() {
   apiPOST("pedido", payload)
     .then(function(res) {
       var idMsg = res.id ? " #" + res.id : "";
-      showMsg("msgPedido", "ok", "✅ Pedido" + idMsg + " registrado para " + cliente);
+      showMsg("msgPedido", "ok", "â Pedido" + idMsg + " registrado para " + cliente);
       resetPedido();
       if (cliente && CAT_CLIENTES.indexOf(cliente) < 0) {
         CAT_CLIENTES.push(cliente);
@@ -674,10 +685,10 @@ function submitPedido() {
       }
     })
     .catch(function(e) {
-      showMsg("msgPedido", "er", "❌ " + (e.message || "Error al registrar"));
+      showMsg("msgPedido", "er", "â " + (e.message || "Error al registrar"));
     })
     .finally(function() {
-      btn.disabled = false; sp.classList.remove("on"); txt.textContent = "🛒 Registrar pedido";
+      btn.disabled = false; sp.classList.remove("on"); txt.textContent = "ð Registrar pedido";
     });
 }
 
@@ -693,45 +704,45 @@ function resetPedido() {
   document.getElementById("fDelivery").value = 0;
 }
 
-// ─── COCINA MODULE ───────────────────────────────────
+// âââ COCINA MODULE âââââââââââââââââââââââââââââââââââ
 function loadCocina() {
-  if (!WURL || !WTOK) { showMsg("msgCocina","er","⚙️ Configura la conexión primero."); return; }
+  if (!WURL || !WTOK) { showMsg("msgCocina","er","âï¸ Configura la conexiÃ³n primero."); return; }
   var cont = document.getElementById("cocinaCont");
   cont.innerHTML = "<div style=\"padding:40px;text-align:center\"><div class=\"ld-big\" style=\"margin:0 auto\"></div><p style=\"color:var(--tx3);margin-top:12px\">Cargando...</p></div>";
   apiGET({vista:"cocina"})
     .then(function(data) {
-      if (!data.pedidos) { cont.innerHTML = proxHTML("cocina"); showMsg("msgCocina","wa","ℹ️ Backend aún no soporta vista=cocina"); return; }
+      if (!data.pedidos) { cont.innerHTML = proxHTML("cocina"); showMsg("msgCocina","wa","â¹ï¸ Backend aÃºn no soporta vista=cocina"); return; }
       var activos = data.pedidos.filter(function(p){ return p.estado !== "Entregado" && p.estado !== "Cancelado"; });
-      if (!activos.length) { cont.innerHTML = emptyHTML("✅","No hay pedidos activos"); return; }
+      if (!activos.length) { cont.innerHTML = emptyHTML("â","No hay pedidos activos"); return; }
       cont.innerHTML = activos.map(function(p){ return renderCard(p, "cocina"); }).join("");
     })
     .catch(function(e) {
       cont.innerHTML = proxHTML("cocina");
-      showMsg("msgCocina","wa","ℹ️ Backend no soporta vista=cocina aún");
+      showMsg("msgCocina","wa","â¹ï¸ Backend no soporta vista=cocina aÃºn");
     });
 }
 
-// ─── REPARTIDOR MODULE ───────────────────────────────
+// âââ REPARTIDOR MODULE âââââââââââââââââââââââââââââââ
 function loadRepartidor() {
-  if (!WURL || !WTOK) { showMsg("msgRepartidor","er","⚙️ Configura la conexión primero."); return; }
+  if (!WURL || !WTOK) { showMsg("msgRepartidor","er","âï¸ Configura la conexiÃ³n primero."); return; }
   var cont = document.getElementById("repartidorCont");
   cont.innerHTML = "<div style=\"padding:40px;text-align:center\"><div class=\"ld-big\" style=\"margin:0 auto\"></div><p style=\"color:var(--tx3);margin-top:12px\">Cargando...</p></div>";
   apiGET({vista:"repartidor"})
     .then(function(data) {
-      if (!data.pedidos) { cont.innerHTML = proxHTML("repartidor"); showMsg("msgRepartidor","wa","ℹ️ Backend aún no soporta vista=repartidor"); return; }
+      if (!data.pedidos) { cont.innerHTML = proxHTML("repartidor"); showMsg("msgRepartidor","wa","â¹ï¸ Backend aÃºn no soporta vista=repartidor"); return; }
       var enCamino = data.pedidos.filter(function(p){ return p.estado === "En camino"; });
-      if (!enCamino.length) { cont.innerHTML = emptyHTML("🎉","No hay envíos pendientes"); return; }
+      if (!enCamino.length) { cont.innerHTML = emptyHTML("ð","No hay envÃ­os pendientes"); return; }
       cont.innerHTML = enCamino.map(function(p){ return renderCard(p, "repartidor"); }).join("");
     })
     .catch(function(e) {
       cont.innerHTML = proxHTML("repartidor");
-      showMsg("msgRepartidor","wa","ℹ️ Backend no soporta vista=repartidor aún");
+      showMsg("msgRepartidor","wa","â¹ï¸ Backend no soporta vista=repartidor aÃºn");
     });
 }
 
 function proxHTML(vista) {
   var label = vista === "cocina" ? "vista=cocina" : "vista=repartidor";
-  return "<div class=\"prox\"><div class=\"prox-ico\">🚧</div><div class=\"prox-ttl\">Próximamente</div><div class=\"prox-sub\">El backend aún no soporta <code>?" + label + "</code>.<br>La estructura está lista. Pulsa Recargar cuando el script v14 esté desplegado.</div></div>";
+  return "<div class=\"prox\"><div class=\"prox-ico\">ð§</div><div class=\"prox-ttl\">PrÃ³ximamente</div><div class=\"prox-sub\">El backend aÃºn no soporta <code>?" + label + "</code>.<br>La estructura estÃ¡ lista. Pulsa Recargar cuando el script v14 estÃ© desplegado.</div></div>";
 }
 function emptyHTML(ico, txt) {
   return "<div class=\"empty\"><div class=\"empty-ico\">" + ico + "</div><div class=\"empty-txt\">" + txt + "</div></div>";
@@ -752,27 +763,27 @@ function badgeClass(est) {
 function renderCard(p, vista) {
   var items = ["plato1","plato2","plato3"].map(function(k,i){
     var n = p[k]; var c = p["cant"+(i+1)];
-    return n ? esc(n) + (c > 1 ? " ×"+c : "") : "";
+    return n ? esc(n) + (c > 1 ? " Ã"+c : "") : "";
   }).filter(Boolean).join(", ");
   var exs = ["extra1","extra2","extra3"].map(function(k,i){
     var n = p[k]; var c = p["cantE"+(i+1)];
-    return n ? esc(n) + (c > 1 ? " ×"+c : "") : "";
+    return n ? esc(n) + (c > 1 ? " Ã"+c : "") : "";
   }).filter(Boolean).join(", ");
   var nextEst = p.estado === "Preparando" ? "En camino" : (p.estado === "En camino" ? "Entregado" : null);
   var html = "<div class=\"order-card\">";
   html += "<div class=\"ocard-hdr\"><span class=\"ocard-cli\">" + esc(p.cliente||"") + "</span><span class=\"ocard-hora\">" + esc(p.hora||p.timestamp||"") + "</span></div>";
   html += "<span class=\"badge " + badgeClass(p.estado) + "\">" + esc(p.estado) + "</span>";
   html += "<div class=\"ocard-items\">" + items + (exs ? "<br>+ " + exs : "") + "</div>";
-  if (p.nota) html += "<div class=\"ocard-nota\">📝 " + esc(p.nota) + "</div>";
-  if (p.metodoPago) html += "<div style=\"font-size:13px;color:var(--tx3);margin-bottom:8px\">💳 " + esc(p.metodoPago) + (p.delivery > 0 ? " · 🛵 $"+p.delivery : "") + "</div>";
+  if (p.nota) html += "<div class=\"ocard-nota\">ð " + esc(p.nota) + "</div>";
+  if (p.metodoPago) html += "<div style=\"font-size:13px;color:var(--tx3);margin-bottom:8px\">ð³ " + esc(p.metodoPago) + (p.delivery > 0 ? " Â· ðµ $"+p.delivery : "") + "</div>";
   if (vista === "cocina" && nextEst) html += "<button class=\"btn-est btn-next\" onclick=\"cambiarEstado('" + esc(p.uuid||"") + "','" + nextEst + "')\">&rarr; Marcar " + nextEst + "</button>";
-  if (vista === "repartidor" && p.estado === "En camino") html += "<button class=\"btn-est btn-ent\" onclick=\"cambiarEstado('" + esc(p.uuid||"") + "','Entregado')\">✅ Marcar entregado</button>";
+  if (vista === "repartidor" && p.estado === "En camino") html += "<button class=\"btn-est btn-ent\" onclick=\"cambiarEstado('" + esc(p.uuid||"") + "','Entregado')\">â Marcar entregado</button>";
   html += "</div>";
   return html;
 }
 
 function cambiarEstado(uuid, nuevoEstado) {
-  if (!confirm("¿Cambiar estado a \"" + nuevoEstado + "\"?")) return;
+  if (!confirm("Â¿Cambiar estado a \"" + nuevoEstado + "\"?")) return;
   apiPOST("estado", {uuid: uuid, estado: nuevoEstado})
     .then(function() {
       var panel = document.querySelector(".panel.active");
@@ -782,9 +793,9 @@ function cambiarEstado(uuid, nuevoEstado) {
     .catch(function(e) { alert("Error: " + (e.message||e)); });
 }
 
-// ═══════════════════════════════════════════════════════
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // AUTOCOMPLETE ENGINE
-// ═══════════════════════════════════════════════════════
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function acInit(key, items) { acD[key] = items; acI[key] = -1; }
 
 function acRepos() { if (acActive) _acPos(acActive); }
@@ -833,7 +844,7 @@ function _acFilter(key) {
   var matches = items.filter(function(it){ return it.label.toLowerCase().indexOf(q) >= 0; });
   acI[key] = -1;
   if (!matches.length) {
-    drop.innerHTML = "<div class=\"ac-empty\">Sin resultados</div>";
+    if(key==="cli"&&inp&&inp.value.trim()){drop.innerHTML='<div class="ac-empty" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Sin resultados</span><button style="background:var(--or);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:700;cursor:pointer" onmousedown="abrirModalCliente(document.getElementById('ai-cli').value)">+ Nuevo</button></div>';}else{drop.innerHTML='<div class="ac-empty">Sin resultados</div>';}
   } else {
     drop.innerHTML = matches.map(function(it) {
       var hl = it.label.replace(new RegExp("(" + q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&") + ")","gi"), "<em>$1</em>");
@@ -907,6 +918,10 @@ function _acHi(opts, idx) {
   opts.forEach(function(o){ o.classList.remove("hi"); });
   if (opts[idx]) { opts[idx].classList.add("hi"); opts[idx].scrollIntoView({block:"nearest"}); }
 }
+
+function abrirModalCliente(n){var m=document.getElementById("modalNuevoCli"),i=document.getElementById("ncNombre");if(m)m.classList.add("on");if(i){i.value=n||"";i.focus();}hideMsg("msgNuevoCli");}
+function cerrarModalCliente(){var m=document.getElementById("modalNuevoCli");if(m)m.classList.remove("on");}
+function submitNuevoCliente(){var nombre=(document.getElementById("ncNombre").value||"").trim(),telefono=(document.getElementById("ncTelefono").value||"").trim(),direccion=(document.getElementById("ncDireccion").value||"").trim(),notas=(document.getElementById("ncNotas").value||"").trim();hideMsg("msgNuevoCli");if(!nombre){showMsg("msgNuevoCli","er","Nombre obligatorio.");return;}if(!telefono){showMsg("msgNuevoCli","er","Telefono obligatorio.");return;}if(!direccion){showMsg("msgNuevoCli","er","Direccion obligatoria.");return;}var btn=document.getElementById("btnNuevoCli"),sp=document.getElementById("spinNuevoCli"),txt=document.getElementById("spinNuevaCliTxt");btn.disabled=true;sp.classList.add("on");txt.textContent="Guardando...";apiPOST("cliente",{accion:"cliente",nombre:nombre,telefono:telefono,direccion:direccion,notas:notas}).then(function(res){if(res.duplicado){showMsg("msgNuevoCli","wa","Cliente ya existe.");return;}if(CAT_CLIENTES.indexOf(nombre)<0){CAT_CLIENTES.push(nombre);acInit("cli",CAT_CLIENTES.map(function(c){return{label:c,value:c};}));}cerrarModalCliente();acSel("cli",nombre);showMsg("msgPedido","ok","Cliente "+nombre+" guardado.");["ncNombre","ncTelefono","ncDireccion","ncNotas"].forEach(function(id){document.getElementById(id).value="";});}).catch(function(e){showMsg("msgNuevoCli","er",e.message||"Error");}).finally(function(){btn.disabled=false;sp.classList.remove("on");txt.textContent="Guardar cliente";});}
 </script>
 </body>
 </html>
