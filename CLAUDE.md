@@ -23,7 +23,7 @@ El negocio prepara solo 3 platos por día. Diana activa/desactiva disponibilidad
 | Repositorio GitHub | https://github.com/Jonathan1-lang/Degusta |
 | Apps Script proyecto | https://script.google.com/home/projects/1JiqDDtxDi2HS_ntJF03219ZvHtxUZJMxOoJdn5UGZ0p6GHscuyIs-UC1/edit |
 | Web App URL (GAS) | https://script.google.com/macros/s/AKfycbyegu7IqgP5WmMtwJ500QK7bWLPf5aOYypmfus5c-4QQqgENRxj8t9DdBKttii1dmA/exec |
-| Script activo | `degusta_script_v15.gs` desplegado como **Versión 18** |
+| Script activo | `degusta_script_v15.gs` desplegado como **Versión 20** |
 | index.html activo | commit `8b62c670` — Degusta v2.1.2 |
 | Token API | `dgst-K7m2Xp9Q-vR4tLw8s-Zn3bHj6c` (CONFIG!B18) |
 | Cuenta propietaria | virtualsv1@gmail.com (Diana Alvarez) |
@@ -122,6 +122,8 @@ El editor web de GitHub no permite pegar via JS de forma confiable.
 | ID | Acción |
 |----|--------|
 | ~~H-14~~ | ~~Token API visible en CONFIG!B18~~ — **Cerrado v14**: movido a PropertiesService, GAS Versión 18. Limpiar CONFIG!B18 manualmente. |
+| ~~BUG-PED-01~~ | ~~Pedidos desde app no se escribían~~ — **Cerrado v14**: doGet no manejaba accion=pedido, GAS Versión 19/20 |
+| ~~BUG-PED-02~~ | ~~ID de pedido por count en vez de max~~ — **Cerrado v14**: gap 030 causaba ID duplicado, GAS Versión 20 |
 | R-20 | Normalizar teléfonos a E.164 en CLIENTES |
 | ~~F-19~~ | ~~Cols Email y Canal en CLIENTES vacías~~ — **Won't fix**: negocio usa solo WhatsApp |
 | N-R04 | Corregir snapshot P.Plato2 en pedido 002 (cosmético) |
