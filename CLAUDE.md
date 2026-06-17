@@ -30,7 +30,7 @@ El negocio prepara solo 3 platos por día. Diana activa/desactiva disponibilidad
 | Co-editor | jonathan_mau2101@hotmail.com |
 | Co-editor Gemini | nias11670@gmail.com |
 | Pedidos reales | 53 (IDs 001–054, gap 030 intencional; próximo: `055`) |
-| Clientes reales | 35 (verificado tras cerrar BUG-CLI-02 en v14) |
+| Clientes reales | 34 (TestVerificacion eliminado; conteo auditado v14) |
 
 ---
 
