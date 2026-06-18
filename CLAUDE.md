@@ -1,5 +1,5 @@
 # CLAUDE.md — Sistema ERP Degusta
-> Actualizado: 17/06/2026 · Sesión v14 · Score: 82/100
+> Actualizado: 17/06/2026 · Sesión v14 · Score: 84/100
 
 ---
 
@@ -23,7 +23,7 @@ El negocio prepara solo 3 platos por día. Diana activa/desactiva disponibilidad
 | Repositorio GitHub | https://github.com/Jonathan1-lang/Degusta |
 | Apps Script proyecto | https://script.google.com/home/projects/1JiqDDtxDi2HS_ntJF03219ZvHtxUZJMxOoJdn5UGZ0p6GHscuyIs-UC1/edit |
 | Web App URL (GAS) | https://script.google.com/macros/s/AKfycbyegu7IqgP5WmMtwJ500QK7bWLPf5aOYypmfus5c-4QQqgENRxj8t9DdBKttii1dmA/exec |
-| Script activo | `degusta_script_v15.gs` desplegado como **Versión 20** |
+| Script activo | `degusta_script_v15.gs` desplegado como **Versión 24** |
 | index.html activo | commit `8b62c670` — Degusta v2.1.2 |
 | Token API | `dgst-K7m2Xp9Q-vR4tLw8s-Zn3bHj6c` (CONFIG!B18) |
 | Cuenta propietaria | virtualsv1@gmail.com (Diana Alvarez) |
@@ -44,11 +44,40 @@ El negocio prepara solo 3 platos por día. Diana activa/desactiva disponibilidad
 | CLIENTES | 34 clientes registrados |
 | BASE_PLATOS | Col E: disponibilidad diaria (Diana activa/desactiva cada mañana) |
 | BASE_EXTRAS | Col D: "Sí"/"No" con tilde — el script normaliza |
-| PEDIDOS | 53 pedidos reales. Cols Q:Y y AC protegidas. Fórmulas pre-llenadas hasta fila 1001. Usar col A para contar pedidos reales. Col AG: UUID |
+| PEDIDOS | 53 pedidos reales. **Es una Tabla de Sheets con columnas TIPADAS** (ver abajo). Cols Q:Y y AC protegidas. Fórmulas pre-llenadas hasta fila 1001. Col AG: UUID |
 | CONFIG | B13: teléfono negocio (NO es método de pago). B18: Token API |
 | COCINA | Hoja completa protegida (solo Diana) |
 | CIERRE_CAJA | Completada hasta 12/06 |
 | INVENTARIO | Fórmulas dinámicas de alerta `=SI(E<=F,"⚠️ REPONER","✅ OK")` |
+
+---
+
+## Esquema de columnas PEDIDOS (CRÍTICO para escribir pedidos)
+
+**PEDIDOS es una Tabla de Sheets con columnas tipadas.** Escribir el tipo equivocado (p.ej. un string a una columna Fecha) se **descarta en silencio** — el `setValue` no lanza error pero el valor no queda. Por eso `registrarPedido` debe escribir el tipo correcto en cada columna.
+
+| Col | Campo | Tipo / Nota al escribir |
+|-----|-------|--------------------------|
+| A | ID | Texto `055` (usar `setNumberFormat('@')`). ID = `max(IDs 1..999)+1`, **ignorar valores ≥1000** (seriales de fecha residuales) |
+| B | Fecha | **objeto `Date`** + `setNumberFormat('dd/MM/yyyy')` |
+| C | Hora | **objeto `Date`** + `setNumberFormat('HH:mm')` |
+| D | Cliente | texto |
+| E,F | Plato1, Cant1 | texto / número |
+| G,H / I,J | Plato2,Cant2 / Plato3,Cant3 | texto / número |
+| K–P | Extra1–3 + cantidades | texto / número |
+| **Q–Y** | Precios y subtotales | **FÓRMULAS — NO escribir** (Q=P.Plato1…, W=Subtotal, X=T.Extras, **Y=TOTAL**) |
+| Z | Pago | texto (Efectivo/Transferencia) |
+| AA | Estado | texto (Preparando/En camino/Entregado/Cancelado/Por cobrar) |
+| AB | Notas | texto |
+| AC | Timestamp | **objeto `Date`** + `setNumberFormat('dd/MM/yyyy HH:mm:ss')` |
+| AD | Dirección entrega | texto |
+| AE | Descuento | número (se **resta** del total) |
+| AF | **Delivery ($)** | número (se **suma** al total) |
+| AG | UUID | texto |
+
+**Fórmula del total:** `Y = W + X − AE + AF`. El costo de delivery va en **AF** y entra solo al total.
+
+**Fila de inserción:** detectar por la última fila con **col D (Cliente)** no vacía + 1 — NO contar por col A (puede tener residuales).
 
 ---
 
@@ -109,8 +138,9 @@ El editor web de GitHub no permite pegar via JS de forma confiable.
 
 - **`"Por cobrar"`** = pago diferido legítimo. No es un error.
 - **Gap 030** en PEDIDOS es intencional. No rellenar.
-- **Col AG** con UUID vacío en pedidos históricos = esperado.
-- **Fórmulas Q:AF pre-llenadas hasta fila 1001** — siempre usar col A para contar pedidos reales.
+- **Col AG** con UUID vacío en pedidos históricos = esperado (los nuevos desde la app sí lo llevan).
+- **Fórmulas Q:Y/AE/AF pre-llenadas hasta fila 1001** — contar pedidos reales por **col D (Cliente)** no vacía, NO por col A (puede tener seriales residuales ≥1000, p.ej. A1001).
+- **Pedidos desde la app SÍ funcionan** (GAS v24): escriben fecha/hora servidor, total con delivery, UUID. El próximo ID se calcula solo.
 - **CONFIG!B13** = teléfono del negocio (72815557). NO es método de pago.
 - **POST en la app se envía como GET+`?d=JSON`** — workaround CORS para GAS. Todo el backend debe asumir este patrón.
 - **`BASE_PLATOS`/`BASE_EXTRAS`** devuelven OBJETOS `{nombre, precio, categoria}` desde v15 — no strings. Cualquier código frontend nuevo debe manejar ambos casos.
@@ -122,8 +152,6 @@ El editor web de GitHub no permite pegar via JS de forma confiable.
 | ID | Acción |
 |----|--------|
 | ~~H-14~~ | ~~Token API visible en CONFIG!B18~~ — **Cerrado v14**: movido a PropertiesService, GAS Versión 18. Limpiar CONFIG!B18 manualmente. |
-| ~~BUG-PED-01~~ | ~~Pedidos desde app no se escribían~~ — **Cerrado v14**: doGet no manejaba accion=pedido, GAS Versión 19/20 |
-| ~~BUG-PED-02~~ | ~~ID de pedido por count en vez de max~~ — **Cerrado v14**: gap 030 causaba ID duplicado, GAS Versión 20 |
 | R-20 | Normalizar teléfonos a E.164 en CLIENTES |
 | ~~F-19~~ | ~~Cols Email y Canal en CLIENTES vacías~~ — **Won't fix**: negocio usa solo WhatsApp |
 | N-R04 | Corregir snapshot P.Plato2 en pedido 002 (cosmético) |
@@ -142,6 +170,11 @@ El editor web de GitHub no permite pegar via JS de forma confiable.
 | BUG-PLAT-01 | Comparación `'sí'` sensible a mayúsculas | v11 | — |
 | BUG-CLI-01 | Autocomplete mostraba "0 clientes" | v12 | — |
 | BUG-CLI-02 | Registro de clientes nunca se escribía en CLIENTES | v14 | GAS Versión 17 |
+| H-14 | Token API hardcodeado → PropertiesService | v14 | GAS Versión 18 |
+| BUG-PED-01 | `doGet` no manejaba `accion=pedido` (pedidos de app se perdían) | v14 | GAS Versión 19/20 |
+| BUG-PED-02 | ID de pedido por count (gap 030 → ID duplicado) → `max+1` | v14 | GAS Versión 20 |
+| BUG-PED-03 | Mapeo de columnas corrido; destruía fórmulas Q:Y | v14 | GAS Versión 21-23 |
+| BUG-PED-04 | Tabla tipada descartaba strings en B/C/AC → escribir `Date` | v14 | GAS Versión 24 |
 | BUG-ENC-01 | Emojis corruptos por doble encoding UTF-8 | v13 | `c5e84865` |
 | BUG-SYN-01 | SyntaxError por comillas mal escapadas en "+Nuevo" | v13 | `375cc78f` |
 | BUG-OBJ-01 | Catálogo fallaba con `s.trim is not a function` | v13 | `8b62c670` |
@@ -152,19 +185,19 @@ El editor web de GitHub no permite pegar via JS de forma confiable.
 
 | Categoría | Score |
 |-----------|------:|
-| Integridad de datos | 78 |
-| Exactitud de cálculos | 78 |
+| Integridad de datos | 82 |
+| Exactitud de cálculos | 82 |
 | Estructura del modelo | 71 |
 | Dashboard / reportes | 78 |
-| Seguridad | 78 |
-| Experiencia de usuario | 84 |
-| Resistencia al estrés | 58 |
-| Trazabilidad | 78 |
-| Usabilidad operativa | 84 |
+| Seguridad | 82 |
+| Experiencia de usuario | 86 |
+| Resistencia al estrés | 60 |
+| Trazabilidad | 82 |
+| Usabilidad operativa | 88 |
 | Diseño de fórmulas | 70 |
-| **Global** | **82** |
+| **Global** | **84** |
 
-> Score subió de 79 → 82 al cerrar BUG-CLI-02 (v14). Próximo salto: mejorar Resistencia al estrés (58) y Diseño de fórmulas (70).
+> Score subió 79 → 82 → 84 en v14: BUG-CLI-02, H-14 y los 4 BUG-PED (pedidos desde app ya funcionan end-to-end). Próximo salto: Resistencia al estrés (60) y Diseño de fórmulas (70).
 
 ---
 
