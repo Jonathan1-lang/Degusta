@@ -4,7 +4,7 @@ Sistema de pedidos para delivery y restaurante pequeño.
 
 ## ¿Qué es?
 
-App móvil (PWA) para tomar pedidos, hacer seguimiento en cocina y gestionar repartidores. Funciona desde el navegador del celular, sin necesidad de instalar nada.
+App web para móvil que permite tomar pedidos desde el celular, sin necesidad de instalar nada. Los módulos de cocina y repartidores están en camino.
 
 ## Abrir la app
 
@@ -12,6 +12,6 @@ App móvil (PWA) para tomar pedidos, hacer seguimiento en cocina y gestionar rep
 
 ## Stack
 
-- **Frontend:** PWA en HTML/JS, publicada en GitHub Pages
+- **Frontend:** App web para móvil en HTML/JS, publicada en GitHub Pages
 - **Backend:** Google Apps Script desplegado como Web App
 - **Base de datos:** Google Sheets
