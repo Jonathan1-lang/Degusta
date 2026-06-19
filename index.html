@@ -1238,7 +1238,13 @@ function abrirCambioPago(btn) {
   } else {
     CAT_REPARTIDORES.forEach(function(r) { var o = document.createElement("option"); o.value = r; o.textContent = r; rep.appendChild(o); });
   }
-  hideMsg("msgCambioPago");
+  if (sel.options.length === 0) {
+    document.getElementById("btnConfirmarPago").disabled = true;
+    showMsg("msgCambioPago","wa","No hay otro método de pago disponible en el catálogo.");
+  } else {
+    document.getElementById("btnConfirmarPago").disabled = false;
+    hideMsg("msgCambioPago");
+  }
   document.getElementById("modalCambioPago").classList.add("on");
 }
 function cerrarCambioPago() { document.getElementById("modalCambioPago").classList.remove("on"); _pagoModal = {}; }
@@ -1260,6 +1266,8 @@ function confirmarCambioPago() {
     })
     .catch(function(e) {
       showMsg("msgCambioPago","er", esc(e.message||"Error al cambiar pago"));
+    })
+    .finally(function() {
       btn.disabled = false; sp.classList.remove("on"); txt.textContent = "Confirmar cambio";
     });
 }
