@@ -210,6 +210,9 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 .ocard-nota{font-size:12.5px;color:var(--am-tx);background:var(--am-bg);border-radius:7px;padding:8px 10px;margin-bottom:9px;line-height:1.5}
 .ocard-meta{font-size:12.5px;color:var(--tx3);margin-bottom:9px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .ocard-dir{font-size:13px;color:var(--tx);background:var(--bg3);border:1px solid var(--bdr);border-radius:7px;padding:8px 10px;margin-bottom:9px;display:flex;align-items:flex-start;gap:6px;line-height:1.45}
+.ocard-cobrar{display:flex;align-items:center;justify-content:space-between;background:var(--gr-bg);border:1px solid rgba(91,117,83,.25);border-radius:7px;padding:8px 10px;margin-bottom:9px;gap:8px}
+.ocard-cobrar span{font-size:14px;color:var(--tx2)}
+.ocard-cobrar strong{color:var(--gr-tx);font-size:15.5px}
 
 .btn-est{height:40px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;padding:0 14px;transition:filter .2s;width:100%;
   display:flex;align-items:center;justify-content:center;gap:6px;font-family:var(--sans)}
@@ -555,6 +558,22 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   </div>
 </div>
 
+<!-- MODAL: cambiar método de pago -->
+<div class="modal-overlay" id="modalCambioPago">
+  <div class="modal-box">
+    <div class="modal-hdr"><span class="modal-ttl">Cambiar método de pago</span><button class="modal-x" onclick="cerrarCambioPago()" aria-label="Cerrar">×</button></div>
+    <div id="cpInfo" style="font-size:13.5px;color:var(--tx2);line-height:1.7;margin-bottom:16px;padding:10px 12px;background:var(--bg3);border-radius:8px;border:1px solid var(--bdr)"></div>
+    <div class="field"><label>Nuevo método de pago <span class="req">*</span></label><select id="cpNuevoMetodo"></select></div>
+    <div class="field"><label>¿Quién hace el cambio? <span class="req">*</span></label><select id="cpRepartidor"><option value="">— Selecciona —</option></select></div>
+    <div id="msgCambioPago" class="msg" style="margin-bottom:12px"></div>
+    <button class="btn-primary" id="btnConfirmarPago" onclick="confirmarCambioPago()">
+      <span class="spin" id="spinPago"></span>
+      <span id="spinPagoTxt">Confirmar cambio</span>
+    </button>
+    <button class="btn-ghost" onclick="cerrarCambioPago()">Cancelar</button>
+  </div>
+</div>
+
 </div>
 <script>
 // ═══════════════════════════════════════════════════════
@@ -569,7 +588,7 @@ let WURL = sessionStorage.getItem(SS_URL) || "";
 let WTOK = sessionStorage.getItem(SS_TOK) || "";
 
 let catLoaded = false, catLoading = false;
-let CAT_PLATOS = [], CAT_EXTRAS = [], CAT_CLIENTES = [], CAT_PAGOS = [], CAT_ESTADOS = [];
+let CAT_PLATOS = [], CAT_EXTRAS = [], CAT_CLIENTES = [], CAT_PAGOS = [], CAT_ESTADOS = [], CAT_REPARTIDORES = [];
 let pCnt = 1, eCnt = 1;
 const DEMO_MODE = false; // este mockup usa datos simulados para visualizar el diseño
 
@@ -807,7 +826,8 @@ function loadCatalog() {
       CAT_EXTRAS=(data.extras||[]).map(function(s){return typeof s==="object"?s.nombre:String(s).trim();}).filter(Boolean);
       CAT_PAGOS   = (data.metodosPago || data.metodos || ["Efectivo","Transferencia"]).map(function(s){ return s.trim(); }).filter(Boolean);
       CAT_ESTADOS = (data.estados || ["Preparando","En camino","Entregado","Cancelado"]).map(function(s){ return s.trim(); }).filter(Boolean);
-      CAT_CLIENTES= (data.clientes || []).map(function(s){ return s.trim(); }).filter(Boolean);
+      CAT_CLIENTES     = (data.clientes     || []).map(function(s){ return s.trim(); }).filter(Boolean);
+      CAT_REPARTIDORES = (data.repartidores || []).map(function(s){ return s.trim(); }).filter(Boolean);
       populateForm();
       renderPizarra();
       catLoaded = true;
@@ -1054,6 +1074,16 @@ function renderCard(p, vista) {
   if (vista === "repartidor" && p.direccion) html += "<div class=\"ocard-dir\">📍 <span>" + esc(p.direccion) + "</span></div>";
   var notaCard = vista === "repartidor" ? (p.notaEntrega || p.nota) : (p.notaCocina || p.nota);
   if (notaCard) html += "<div class=\"ocard-nota\">" + esc(notaCard) + "</div>";
+  if (vista === "repartidor" && p.estado === "En camino") {
+    html += "<div class=\"ocard-cobrar\"><span>Cobrar: <strong>$" + (p.total||0).toFixed(2) + "</strong></span>"
+      + "<button class=\"btn-outline-sm\""
+      + " data-uuid=\"" + esc(p.uuid||"") + "\""
+      + " data-id=\""   + esc(p.id||"")   + "\""
+      + " data-cli=\""  + esc(p.cliente||"") + "\""
+      + " data-met=\""  + esc(p.metodoPago||"") + "\""
+      + " data-tot=\""  + (p.total||0) + "\""
+      + " onclick=\"abrirCambioPago(this)\">✎ Cambiar pago</button></div>";
+  }
   if (p.metodoPago) html += "<div class=\"ocard-meta\"><span>" + esc(p.metodoPago) + "</span>" + (p.delivery > 0 ? "<span>· delivery $"+p.delivery+"</span>" : "") + "</div>";
   if (vista === "cocina" && nextEst) html += "<button class=\"btn-est btn-next\" onclick=\"cambiarEstado('" + esc(p.uuid||"") + "','" + nextEst + "')\">→ Marcar " + nextEst + "</button>";
   if (vista === "repartidor" && p.estado === "En camino") html += "<button class=\"btn-est btn-ent\" onclick=\"cambiarEstado('" + esc(p.uuid||"") + "','Entregado')\">✓ Marcar entregado</button>";
@@ -1188,6 +1218,50 @@ function mostrarClienteDuplicado(res) {
   if (c.telefono)  det += "<br>📞 " + esc(c.telefono);
   if (c.direccion) det += "<br>📍 " + esc(c.direccion);
   showMsg("msgNuevoCli", "wa", titulo + "<br>" + det);
+}
+
+// ─── CAMBIAR MÉTODO DE PAGO ──────────────────────────
+var _pagoModal = {};
+function abrirCambioPago(btn) {
+  _pagoModal = { uuid:btn.dataset.uuid, id:btn.dataset.id, cliente:btn.dataset.cli, metodoActual:btn.dataset.met, total:parseFloat(btn.dataset.tot)||0 };
+  var info = document.getElementById("cpInfo");
+  info.innerHTML = "<strong>" + esc(_pagoModal.cliente) + "</strong><br>Método actual: <strong>" + esc(_pagoModal.metodoActual) + "</strong> &nbsp;·&nbsp; Total a cobrar: <strong style=\"color:var(--gr-tx)\">$" + _pagoModal.total.toFixed(2) + "</strong>";
+  var sel = document.getElementById("cpNuevoMetodo");
+  sel.innerHTML = "";
+  CAT_PAGOS.forEach(function(m) {
+    if (m !== _pagoModal.metodoActual) { var o = document.createElement("option"); o.value = m; o.textContent = m; sel.appendChild(o); }
+  });
+  var rep = document.getElementById("cpRepartidor");
+  rep.innerHTML = "<option value=\"\">— Selecciona —</option>";
+  if (!CAT_REPARTIDORES.length) {
+    rep.innerHTML += "<option value=\"\" disabled>Sin repartidores — agrega nombres en CONFIG B20:B25</option>";
+  } else {
+    CAT_REPARTIDORES.forEach(function(r) { var o = document.createElement("option"); o.value = r; o.textContent = r; rep.appendChild(o); });
+  }
+  hideMsg("msgCambioPago");
+  document.getElementById("modalCambioPago").classList.add("on");
+}
+function cerrarCambioPago() { document.getElementById("modalCambioPago").classList.remove("on"); _pagoModal = {}; }
+function confirmarCambioPago() {
+  var nuevoMetodo = document.getElementById("cpNuevoMetodo").value;
+  var repartidor  = document.getElementById("cpRepartidor").value;
+  if (!nuevoMetodo) { showMsg("msgCambioPago","er","Selecciona el nuevo método de pago."); return; }
+  if (!repartidor)  { showMsg("msgCambioPago","er","Selecciona el repartidor."); return; }
+  var btn = document.getElementById("btnConfirmarPago");
+  var sp  = document.getElementById("spinPago");
+  var txt = document.getElementById("spinPagoTxt");
+  btn.disabled = true; sp.classList.add("on"); txt.textContent = "Guardando...";
+  apiPOST("pago", { uuid:_pagoModal.uuid, id:_pagoModal.id, metodoPago:nuevoMetodo, repartidor:repartidor })
+    .then(function() {
+      cerrarCambioPago();
+      invalidarVistas();
+      loadRepartidor();
+      showMsg("msgRepartidor","ok","Pago cambiado a " + esc(nuevoMetodo) + ". Registrado en LOG_PAGOS.");
+    })
+    .catch(function(e) {
+      showMsg("msgCambioPago","er", esc(e.message||"Error al cambiar pago"));
+      btn.disabled = false; sp.classList.remove("on"); txt.textContent = "Confirmar cambio";
+    });
 }
 
 // ═══════════════════════════════════════════════════════
