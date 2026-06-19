@@ -649,6 +649,13 @@ function goTab(t) {
   if (t === "repartidor" && !document.getElementById("repartidorCont").dataset.loaded) loadRepartidor();
 }
 
+// Marca cocina/envios como "no cargadas" para que se refresquen al volver a entrar
+// (tras crear un pedido o cambiar su estado).
+function invalidarVistas() {
+  var cc = document.getElementById("cocinaCont"); if (cc) cc.dataset.loaded = "";
+  var rc = document.getElementById("repartidorCont"); if (rc) rc.dataset.loaded = "";
+}
+
 // ─── MESSAGES ────────────────────────────────────────
 function showMsg(id, type, txt) {
   var el = document.getElementById(id);
@@ -927,6 +934,7 @@ function submitPedido() {
     setTimeout(function(){
       showMsg("msgPedido", "ok", "Pedido #056 registrado para " + esc(cliente) + " (demostración, no se guardó).");
       resetPedido();
+      invalidarVistas();
       btn.disabled = false; sp.classList.remove("on"); txt.textContent = "Registrar pedido";
     }, 650);
     return;
@@ -937,6 +945,7 @@ function submitPedido() {
       var idMsg = res.id ? " #" + res.id : "";
       showMsg("msgPedido", "ok", "Pedido" + idMsg + " registrado para " + esc(cliente));
       resetPedido();
+      invalidarVistas();
       if (cliente && CAT_CLIENTES.indexOf(cliente) < 0) {
         CAT_CLIENTES.push(cliente);
         acInit("cli", CAT_CLIENTES.map(function(c){ return {label:c, value:c}; }));
@@ -1056,6 +1065,7 @@ function cambiarEstado(uuid, nuevoEstado) {
   if (!confirm("¿Cambiar estado a \"" + nuevoEstado + "\"?")) return;
   if (DEMO_MODE) {
     DEMO_COCINA.forEach(function(p){ if (p.uuid === uuid) p.estado = nuevoEstado; });
+    invalidarVistas();
     var panel = document.querySelector(".panel.active");
     if (panel && panel.id === "panel-cocina") loadCocina();
     if (panel && panel.id === "panel-repartidor") loadRepartidor();
@@ -1063,6 +1073,7 @@ function cambiarEstado(uuid, nuevoEstado) {
   }
   apiPOST("estado", {uuid: uuid, estado: nuevoEstado})
     .then(function() {
+      invalidarVistas();
       var panel = document.querySelector(".panel.active");
       if (panel && panel.id === "panel-cocina") loadCocina();
       if (panel && panel.id === "panel-repartidor") loadRepartidor();
