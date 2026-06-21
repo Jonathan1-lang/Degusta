@@ -1,0 +1,9 @@
+# ⚠️ Documentación interna con SECRETOS — NUNCA subir al repo público
+# (token API, Web App URL, Sheet ID, correos)
+CLAUDE.md
+
+# Notas / scratch local que no deben ir al repo público.
+# Descomenta lo que NO quieras versionar:
+# DEPLOY_GUIDE_v17.1.md
+# SPEC.md
+# degusta-mockup.html
