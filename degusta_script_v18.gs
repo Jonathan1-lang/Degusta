@@ -388,8 +388,9 @@ function registrarPedido(p) {
     function num(v){ var n = parseFloat(v); return isNaN(n) ? '' : n; }
     function w(col, value){ sh.getRange(row, col).setValue(value); }
     sh.getRange(row,1).setNumberFormat('@').setValue(id);
-    sh.getRange(row,2).setNumberFormat('dd/MM/yyyy').setValue(now);
-    sh.getRange(row,3).setNumberFormat('HH:mm').setValue(now);
+    var soloFecha = new Date(now.getFullYear(), now.getMonth(), now.getDate());  // fecha sin hora
+    sh.getRange(row,2).setNumberFormat('dd/MM/yyyy').setValue(soloFecha);        // B: SOLO fecha (sin hora → el dashboard suma bien por fecha)
+    sh.getRange(row,3).setNumberFormat('HH:mm').setValue(now);                   // C: hora
     sh.getRange(row,4,1,13).setValues([[
       String(p.cliente||'').trim(),
       String(p.plato1||''), num(p.cant1),
