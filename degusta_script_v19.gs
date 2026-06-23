@@ -1,5 +1,7 @@
 // ================================================================
-// degusta_script_v18.gs — Sistema ERP Degusta
+// degusta_script_v19.gs — Sistema ERP Degusta
+// v19: + telefono del cliente en vista=repartidor (para el botón
+//      "Contactar cliente" — llamada / WhatsApp en la app). (22/06/2026)
 // v18: + total en vista=repartidor (col Y), accion=pago,
 //      LOG_PAGOS (auditoría de cambios de pago), repartidores
 //      desde CONFIG!B20:B25. (19/06/2026)
@@ -164,9 +166,11 @@ function doGet(e) {
       const rows = sh.getRange(2, 1, last-1, 33).getValues();
       const cli  = ss.getSheetByName('CLIENTES').getRange('B2:D200').getValues();
       const dirPorNombre = {};
+      const telPorNombre = {};
       cli.forEach(function(c) {
         var n = String(c[0]||'').trim().toLowerCase();
-        if (n) dirPorNombre[n] = String(c[2]||'').trim();
+        if (n) { dirPorNombre[n] = String(c[2]||'').trim();   // col D
+                 telPorNombre[n] = String(c[1]||'').trim(); } // col C
       });
       const out = [];
       rows.forEach(function(r) {
@@ -182,6 +186,7 @@ function doGet(e) {
           total:Number(r[24])||0,                              // col Y (fórmula, solo lectura)
           notaEntrega:String(r[29]||''),                       // col AD
           direccion:dirPorNombre[cliente.toLowerCase()] || '',
+          telefono:telPorNombre[cliente.toLowerCase()] || '',  // col C de CLIENTES
           delivery:Number(r[31])||0 });
       });
       return jsonResponse({ ok:true, pedidos:out });
