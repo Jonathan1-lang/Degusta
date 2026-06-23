@@ -221,6 +221,8 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 .btn-ent{background:var(--gr);color:#fff}
 .btn-contacto{width:100%;height:38px;border:1.5px solid var(--bdr2);background:var(--bg3);color:var(--tx2);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:9px;display:flex;align-items:center;justify-content:center;gap:7px;transition:border-color .2s,color .2s}
 .btn-contacto:hover,.btn-contacto.open{border-color:var(--ac);color:var(--ac)}
+.btn-waze{width:100%;height:38px;border:1.5px solid var(--bdr2);background:var(--bg3);color:var(--tx2);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:9px;display:flex;align-items:center;justify-content:center;gap:7px;text-decoration:none;transition:border-color .2s,color .2s}
+.btn-waze:hover{border-color:var(--bl);color:var(--bl)}
 .contacto-opts{display:flex;gap:8px;margin-bottom:9px}
 .c-opt{flex:1;height:40px;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:7px;color:#fff;transition:filter .2s}
 .c-opt:hover{filter:brightness(1.1)}
@@ -1125,7 +1127,10 @@ function renderCard(p, vista) {
   html += "<div class=\"ocard-hdr\"><span class=\"ocard-cli\">" + esc(p.cliente||"") + "</span><span class=\"ocard-hora\">" + esc(p.hora||p.timestamp||"") + "</span></div>";
   html += "<span class=\"sello " + selloClass(p.estado) + "\">" + esc(p.estado) + "</span>";
   html += "<div class=\"ocard-items\">" + items + (exs ? "<br><span class=\"ocard-extras\">+ " + exs + "</span>" : "") + "</div>";
-  if (vista === "repartidor" && p.direccion) html += "<div class=\"ocard-dir\">📍 <span>" + esc(p.direccion) + "</span></div>";
+  if (vista === "repartidor" && p.direccion) {
+    html += "<div class=\"ocard-dir\">📍 <span>" + esc(p.direccion) + "</span></div>";
+    html += "<a class=\"btn-waze\" href=\"https://waze.com/ul?q=" + encodeURIComponent(p.direccion + ", El Salvador") + "&navigate=yes\" target=\"_blank\" rel=\"noopener\">🧭 Navegar con Waze</a>";
+  }
   var tn = telNorm(p.telefono);
   if (vista === "repartidor" && tn) {
     html += "<div class=\"ocard-contacto\">"
