@@ -219,6 +219,18 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 .btn-est:hover{filter:brightness(1.1)}
 .btn-next{background:var(--ac);color:#fff}
 .btn-ent{background:var(--gr);color:#fff}
+.btn-contacto{width:100%;height:38px;border:1.5px solid var(--bdr2);background:var(--bg3);color:var(--tx2);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:9px;display:flex;align-items:center;justify-content:center;gap:7px;transition:border-color .2s,color .2s}
+.btn-contacto:hover,.btn-contacto.open{border-color:var(--ac);color:var(--ac)}
+.contacto-opts{display:flex;gap:8px;margin-bottom:9px}
+.c-opt{flex:1;height:40px;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:7px;color:#fff;transition:filter .2s}
+.c-opt:hover{filter:brightness(1.1)}
+.c-call{background:var(--bl)}
+.c-wa{background:var(--gr)}
+.cocina-resumen{background:var(--bg3);border:1px solid var(--bdr);border-radius:10px;padding:11px 13px;margin-bottom:12px}
+.rc-ttl{font-size:11.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--tx3);margin-bottom:8px}
+.rc-chips{display:flex;flex-wrap:wrap;gap:7px}
+.rc-chip{background:var(--bg2);border:1px solid var(--bdr2);border-radius:7px;padding:5px 10px;font-size:13px;color:var(--tx2);font-weight:600}
+.rc-chip strong{color:var(--ac);font-weight:800;margin-left:2px}
 
 .conn-badge{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;padding:9px 13px;border-radius:9px;margin-bottom:12px;width:100%}
 .cb-ok{background:var(--gr-bg);color:var(--gr-tx);border:1px solid rgba(91,117,83,.3)}
@@ -461,6 +473,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     <button class="btn-outline-sm" onclick="loadCocina()">↻ Recargar</button>
   </div>
   <div id="msgCocina" class="msg"></div>
+  <div id="cocinaResumen" class="cocina-resumen" style="display:none"></div>
   <div id="cocinaCont"></div>
 </div>
 
@@ -516,7 +529,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   <div class="card">
     <div class="card-title">Acerca de</div>
     <div style="font-size:13px;color:var(--tx3);line-height:2">
-      <div><strong style="color:var(--tx2)">App:</strong> Degusta v3.0</div>
+      <div><strong style="color:var(--tx2)">App:</strong> Degusta v3.1</div>
       <div><strong style="color:var(--tx2)">Diseño:</strong> Pizarra del día</div>
       <div><strong style="color:var(--tx2)">Datos:</strong> sessionStorage (se borra al cerrar)</div>
       <div><strong style="color:var(--tx2)">Backend:</strong> Google Apps Script</div>
@@ -577,7 +590,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 </div>
 <script>
 // ═══════════════════════════════════════════════════════
-// DEGUSTA v3.0 — JS Engine
+// DEGUSTA v3.1 — JS Engine
 // Misma arquitectura que v2.1.2: POST vía GET+d (CORS workaround)
 // Este mockup corre con DATOS DE DEMOSTRACIÓN si no hay backend real configurado.
 // ═══════════════════════════════════════════════════════
@@ -989,11 +1002,36 @@ function resetPedido() {
 }
 
 // ─── COCINA MODULE ───────────────────────────────────
+// Suma cantidades por plato en los pedidos "Preparando" para cocinar por lotes.
+function renderResumenCocina(pedidos) {
+  var box = document.getElementById("cocinaResumen");
+  if (!box) return;
+  var conteo = {}, orden = [];
+  (pedidos || []).forEach(function(p) {
+    ["plato1","plato2","plato3"].forEach(function(k,i) {
+      var n = String(p[k]||"").trim();
+      if (!n) return;
+      var c = Number(p["cant"+(i+1)]) || 1;
+      if (conteo[n] === undefined) { conteo[n] = 0; orden.push(n); }
+      conteo[n] += c;
+    });
+  });
+  if (!orden.length) { box.style.display = "none"; box.innerHTML = ""; return; }
+  var total = orden.reduce(function(s,n){ return s + conteo[n]; }, 0);
+  var chips = orden.map(function(n) {
+    return "<span class=\"rc-chip\">" + esc(n) + " <strong>×" + conteo[n] + "</strong></span>";
+  }).join("");
+  box.innerHTML = "<div class=\"rc-ttl\">A cocinar · " + total + " platos</div><div class=\"rc-chips\">" + chips + "</div>";
+  box.style.display = "block";
+}
+
 function loadCocina() {
   var cont = document.getElementById("cocinaCont");
+  var rb = document.getElementById("cocinaResumen"); if (rb) rb.style.display = "none";
   if (DEMO_MODE) {
     var activos = DEMO_COCINA.filter(function(p){ return p.estado !== "Entregado" && p.estado !== "Cancelado"; });
     cont.innerHTML = activos.length ? activos.map(function(p){ return renderCard(p, "cocina"); }).join("") : emptyHTML("No hay pedidos activos");
+    renderResumenCocina(activos);
     cont.dataset.loaded = "1";
     return;
   }
@@ -1004,6 +1042,7 @@ function loadCocina() {
       if (!data.pedidos) { cont.innerHTML = proxHTML("cocina"); showMsg("msgCocina","wa","Backend aún no soporta vista=cocina"); return; }
       var activos = data.pedidos.filter(function(p){ return p.estado !== "Entregado" && p.estado !== "Cancelado"; });
       cont.innerHTML = activos.length ? activos.map(function(p){ return renderCard(p, "cocina"); }).join("") : emptyHTML("No hay pedidos activos");
+      renderResumenCocina(activos);
       cont.dataset.loaded = "1";
     })
     .catch(function(e) { cont.innerHTML = proxHTML("cocina"); showMsg("msgCocina","wa","Backend no soporta vista=cocina aún"); });
@@ -1042,6 +1081,21 @@ function esc(s) {
   return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 
+// Normaliza un teléfono salvadoreño a formato internacional sin "+": 503 + últimos 8 dígitos.
+function telNorm(tel) {
+  var d = String(tel||"").replace(/\D/g,"");
+  return d ? "503" + d.slice(-8) : "";
+}
+
+// Despliega/oculta las opciones de contacto (Llamada / WhatsApp) bajo el botón.
+function toggleContacto(btn) {
+  var opts = btn.nextElementSibling;
+  if (!opts) return;
+  var abrir = opts.style.display === "none";
+  opts.style.display = abrir ? "flex" : "none";
+  btn.classList.toggle("open", abrir);
+}
+
 function selloClass(est) {
   if (est === "Preparando") return "s-prep";
   if (est === "En camino") return "s-cam";
@@ -1061,7 +1115,7 @@ function renderCard(p, vista) {
   var items = ["plato1","plato2","plato3"].map(function(k,i){
     var n = p[k]; var c = p["cant"+(i+1)];
     return n ? esc(n) + (c > 1 ? " ×"+c : "") : "";
-  }).filter(Boolean).join(", ");
+  }).filter(Boolean).join("<br>");
   var exs = ["extra1","extra2","extra3"].map(function(k,i){
     var n = p[k]; var c = p["cantE"+(i+1)];
     return n ? esc(n) + (c > 1 ? " ×"+c : "") : "";
@@ -1072,6 +1126,15 @@ function renderCard(p, vista) {
   html += "<span class=\"sello " + selloClass(p.estado) + "\">" + esc(p.estado) + "</span>";
   html += "<div class=\"ocard-items\">" + items + (exs ? "<br><span class=\"ocard-extras\">+ " + exs + "</span>" : "") + "</div>";
   if (vista === "repartidor" && p.direccion) html += "<div class=\"ocard-dir\">📍 <span>" + esc(p.direccion) + "</span></div>";
+  var tn = telNorm(p.telefono);
+  if (vista === "repartidor" && tn) {
+    html += "<div class=\"ocard-contacto\">"
+      + "<button class=\"btn-contacto\" onclick=\"toggleContacto(this)\">📞 Contactar cliente</button>"
+      + "<div class=\"contacto-opts\" style=\"display:none\">"
+      +   "<a class=\"c-opt c-call\" href=\"tel:+" + esc(tn) + "\">📞 Llamada</a>"
+      +   "<a class=\"c-opt c-wa\" href=\"https://wa.me/" + esc(tn) + "\" target=\"_blank\" rel=\"noopener\">💬 WhatsApp</a>"
+      + "</div></div>";
+  }
   var notaCard = vista === "repartidor" ? (p.notaEntrega || p.nota) : (p.notaCocina || p.nota);
   if (notaCard) html += "<div class=\"ocard-nota\">" + esc(notaCard) + "</div>";
   if (vista === "repartidor" && p.estado === "En camino") {
