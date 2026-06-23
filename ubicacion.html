@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#141310">
+<title>Degusta — Mi ubicación de entrega</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{
+    --bg:#141310; --card:#201E18; --tx:#F2EFE7; --tx2:#BDB9AD; --tx3:#8C887D;
+    --bdr:#363229; --ac:#5AA86E; --ac-d:#82CD96; --er-bg:#3A1E1E; --er-tx:#F0A6A6;
+    --ok-bg:#1F2C18; --ok-tx:#9FD389;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--tx);font-family:'Inter',system-ui,sans-serif;
+    line-height:1.5;padding:18px 14px 40px}
+  .wrap{max-width:460px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--bdr);border-radius:16px;
+    padding:20px 18px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .brand{font-size:13px;font-weight:600;color:var(--ac-d);letter-spacing:.3px;margin-bottom:8px}
+  h1{font-family:'Fraunces',serif;font-size:23px;font-weight:600;margin:0 0 4px}
+  .sub{font-size:14px;color:var(--tx2);margin:0 0 18px}
+  label{display:block;font-size:13px;font-weight:600;color:var(--tx2);margin:14px 0 5px}
+  .req{color:var(--ac-d)}
+  .seg{display:flex;gap:6px;margin:2px 0}
+  .seg-btn{flex:1;font-family:inherit;font-size:14px;font-weight:600;padding:10px;border:1px solid var(--bdr);border-radius:10px;background:#16150F;color:var(--tx2);cursor:pointer}
+  .seg-btn.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+  input,textarea{width:100%;font-family:inherit;font-size:16px;color:var(--tx);
+    background:#16150F;border:1px solid var(--bdr);border-radius:10px;padding:11px 12px;outline:none}
+  input::placeholder,textarea::placeholder{color:var(--tx3)}
+  input:focus,textarea:focus{border-color:var(--ac);box-shadow:0 0 0 3px rgba(63,138,82,.15)}
+  textarea{resize:none}
+  .maplbl{display:flex;justify-content:space-between;align-items:baseline}
+  #map{height:230px;border:1px solid var(--bdr);border-radius:12px;margin-top:6px;background:#2A2823}
+  .pinnote{font-size:12px;color:var(--tx3);margin-top:6px;min-height:16px}
+  .mapfail{height:100%;display:flex;align-items:center;justify-content:center;
+    text-align:center;font-size:13px;color:var(--tx3);padding:16px}
+  .btn{width:100%;font-family:inherit;font-size:15px;font-weight:600;border-radius:10px;
+    padding:12px;border:1px solid var(--bdr);background:#16150F;color:var(--tx);cursor:pointer;margin-top:8px}
+  .btn:active{transform:scale(.99)}
+  .btn-geo{color:var(--ac-d);border-color:var(--ac)}
+  .btn-save{background:var(--ac);color:#fff;border-color:var(--ac);font-size:16px;margin-top:18px}
+  .btn:disabled{opacity:.55;cursor:default}
+  .msg{margin-top:14px;padding:11px 12px;border-radius:10px;font-size:14px;display:none}
+  .msg.on{display:block}
+  .msg.er{background:var(--er-bg);color:var(--er-tx)}
+  .done{text-align:center;padding:18px 6px}
+  .done .big{font-size:42px;margin-bottom:8px}
+  .done h2{font-family:'Fraunces',serif;font-size:22px;margin:0 0 6px}
+  .done p{color:var(--tx2);font-size:15px;margin:0}
+  .foot{text-align:center;font-size:11px;color:var(--tx3);margin-top:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card" id="formCard">
+    <div class="brand">🍽️ Degusta</div>
+    <h1>Tu ubicación de entrega</h1>
+    <p class="sub">Llená esto una sola vez. Nos ayuda a entregarte <strong>más rápido y siempre al punto exacto</strong>.</p>
+
+    <label>¿A dónde entregamos?</label>
+    <div class="seg">
+      <button type="button" class="seg-btn on" id="seg-casa" onclick="setTipo('Casa')">🏠 Casa</button>
+      <button type="button" class="seg-btn" id="seg-ofi" onclick="setTipo('Oficina')">🏢 Oficina / empresa</button>
+    </div>
+
+    <label>Nombre <span class="req">*</span></label>
+    <input id="nombre" type="text" maxlength="80" placeholder="Solo para saber a quién buscar" autocomplete="name">
+
+    <label>Teléfono (WhatsApp) <span class="req">*</span></label>
+    <input id="telefono" type="tel" maxlength="25" placeholder="Ej. 7000 0000" autocomplete="tel">
+
+    <div id="empWrap" style="display:none">
+      <label>Empresa o edificio <span class="req">*</span></label>
+      <input id="empresa" type="text" maxlength="100" placeholder="Ej. Torre Insigne, Tigo, Plaza Merliot...">
+    </div>
+
+    <label id="lblDir">Dirección de tu casa <span class="req">*</span></label>
+    <input id="direccion" type="text" maxlength="150" placeholder="Ej. Col. Las Flores, pasaje 3, casa #12">
+
+    <label>Referencia para ubicarte</label>
+    <textarea id="referencia" rows="2" maxlength="250" placeholder="Ej. portón negro, frente a la tienda, timbre 2 veces"></textarea>
+
+    <div class="maplbl"><label style="margin-bottom:0">Tu punto en el mapa <span class="req">*</span></label></div>
+    <div id="map"></div>
+    <div class="pinnote" id="pinNote">Tocá tu ubicación en el mapa, o usá el botón de abajo.</div>
+    <button class="btn btn-geo" id="btnGeo" type="button" onclick="useMyLocation()">📍 Usar mi ubicación actual</button>
+
+    <div class="msg" id="msg"></div>
+    <button class="btn btn-save" id="btnSave" type="button" onclick="enviar()">Guardar mis datos</button>
+    <div class="foot">Tus datos solo se usan para coordinar tu entrega.</div>
+  </div>
+
+  <div class="card" id="doneCard" style="display:none">
+    <div class="done">
+      <div class="big">🎉</div>
+      <h2>¡Listo, gracias!</h2>
+      <p>Quedaste registrado/a. Desde tu próximo pedido te entregamos más rápido. ¡Buen provecho!</p>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  // URL pública del Web App de Apps Script. Necesaria para que el
+  // formulario funcione desde el teléfono del cliente. NO contiene el token.
+  // (La acción "ubicacion" es pública y solo escribe en la cola de revisión.)
+  var API_URL = "https://script.google.com/macros/s/AKfycbyegu7IqgP5WmMtwJ500QK7bWLPf5aOYypmfus5c-4QQqgENRxj8t9DdBKttii1dmA/exec";
+
+  // Centro por defecto: Ciudad Merliot (zona de reparto)
+  var DEFAULT_CENTER = [13.6736, -89.2890], DEFAULT_ZOOM = 14;
+  var map = null, marker = null, picked = null;
+  var tipo = "Casa";
+
+  function setTipo(t){
+    tipo = t;
+    var casa = (t === "Casa");
+    document.getElementById("seg-casa").classList.toggle("on", casa);
+    document.getElementById("seg-ofi").classList.toggle("on", !casa);
+    document.getElementById("empWrap").style.display = casa ? "none" : "";
+    document.getElementById("lblDir").innerHTML = casa
+      ? 'Dirección de tu casa <span class="req">*</span>'
+      : 'Dirección del edificio <span class="req">*</span>';
+    document.getElementById("direccion").placeholder = casa
+      ? "Ej. Col. Las Flores, pasaje 3, casa #12"
+      : "Ej. Calle La Reforma #123, Col. San Benito";
+    document.getElementById("referencia").placeholder = casa
+      ? "Ej. portón negro, frente a la tienda, timbre 2 veces"
+      : "Ej. entregar en recepción, preguntar por Ana";
+  }
+
+  function val(id){ return (document.getElementById(id).value || "").trim(); }
+  function msg(t){ var m=document.getElementById("msg"); m.textContent=t; m.className="msg on er"; m.scrollIntoView({behavior:"smooth",block:"nearest"}); }
+  function clearMsg(){ document.getElementById("msg").className="msg"; }
+
+  function initMap(){
+    try {
+      map = L.map("map",{zoomControl:true}).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom:19, attribution:"&copy; OpenStreetMap"
+      }).addTo(map);
+      map.on("click", function(e){ setPin(e.latlng.lat, e.latlng.lng); });
+    } catch(err){
+      document.getElementById("map").innerHTML =
+        '<div class="mapfail">No se pudo cargar el mapa. Usá &ldquo;Usar mi ubicación&rdquo; o escribí bien la dirección y la referencia.</div>';
+    }
+  }
+
+  function setPin(lat, lng){
+    picked = { lat:lat, lng:lng };
+    if (map){
+      if (!marker){
+        marker = L.marker([lat,lng], {draggable:true}).addTo(map);
+        marker.on("dragend", function(){ var p=marker.getLatLng(); picked={lat:p.lat,lng:p.lng}; markPinOk(); });
+      } else { marker.setLatLng([lat,lng]); }
+      map.setView([lat,lng], Math.max(map.getZoom(), 16));
+    }
+    markPinOk();
+  }
+  function markPinOk(){
+    var el=document.getElementById("pinNote");
+    el.textContent="Pin colocado ✓ — arrastralo si quedó corrido.";
+    el.style.color="var(--ac-d)";
+  }
+
+  function useMyLocation(){
+    clearMsg();
+    if (!navigator.geolocation){ msg("Tu teléfono no permite ubicación automática. Tocá tu ubicación en el mapa."); return; }
+    var b=document.getElementById("btnGeo"); b.disabled=true; b.textContent="Buscando tu ubicación…";
+    navigator.geolocation.getCurrentPosition(function(pos){
+      setPin(pos.coords.latitude, pos.coords.longitude);
+      b.disabled=false; b.innerHTML="📍 Usar mi ubicación actual";
+    }, function(){
+      b.disabled=false; b.innerHTML="📍 Usar mi ubicación actual";
+      msg("No pudimos obtener tu ubicación (a veces falla dentro de edificios). Tocá tu ubicación en el mapa.");
+    }, { enableHighAccuracy:true, timeout:10000, maximumAge:0 });
+  }
+
+  function enviar(){
+    clearMsg();
+    if (!val("nombre"))    return msg("Escribí tu nombre.");
+    if (!val("telefono"))  return msg("Escribí tu teléfono.");
+    if (tipo !== "Casa" && !val("empresa")) return msg("Escribí la empresa o edificio.");
+    if (!val("direccion")) return msg(tipo === "Casa" ? "Escribí la dirección de tu casa." : "Escribí la dirección del edificio.");
+    if (!picked)           return msg("Poné el pin en el mapa: usá “Usar mi ubicación” o tocá tu ubicación.");
+
+    var payload = {
+      tipo: tipo,
+      nombre: val("nombre"), telefono: val("telefono"),
+      empresa: (tipo === "Casa" ? "" : val("empresa")),
+      direccion: val("direccion"), referencia: val("referencia"),
+      lat: picked.lat, lng: picked.lng
+    };
+    var u = new URL(API_URL);
+    u.searchParams.set("accion", "ubicacion");
+    u.searchParams.set("d", JSON.stringify(payload));
+
+    var btn=document.getElementById("btnSave"); btn.disabled=true; btn.textContent="Enviando…";
+    var ctrl=new AbortController(); var to=setTimeout(function(){ ctrl.abort(); }, 20000);
+    fetch(u.toString(), { signal:ctrl.signal })
+      .then(function(r){ clearTimeout(to); if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+      .then(function(d){ if(d.ok===false) throw new Error(d.error||"Error"); exito(); })
+      .catch(function(e){
+        clearTimeout(to);
+        btn.disabled=false; btn.textContent="Guardar mis datos";
+        msg("No se pudo enviar ("+(e.message||e)+"). Revisá tu internet y probá de nuevo.");
+      });
+  }
+
+  function exito(){
+    document.getElementById("formCard").style.display="none";
+    document.getElementById("doneCard").style.display="";
+    window.scrollTo(0,0);
+  }
+
+  initMap();
+</script>
+</body>
+</html>

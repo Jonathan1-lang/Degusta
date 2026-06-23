@@ -1,5 +1,8 @@
 // ================================================================
-// degusta_script_v19.gs — Sistema ERP Degusta
+// degusta_script_v20.gs — Sistema ERP Degusta
+// v20: + captura PÚBLICA de ubicación de clientes (accion=ubicacion,
+//      SIN token) → cola de revisión UBICACIONES_PENDIENTES.
+//      Aditivo: NO cambia nada de Cocina/Envíos. Diana aprueba a mano.
 // v19: + telefono del cliente en vista=repartidor (para el botón
 //      "Contactar cliente" — llamada / WhatsApp en la app). (22/06/2026)
 // v18: + total en vista=repartidor (col Y), accion=pago,
@@ -98,10 +101,21 @@ function pruebaDashboard() { actualizarResumenDiario(); }
 // ══════════════════════════════════════════════════════════════
 function doGet(e) {
   try {
+    const accionParam = (e.parameter || {}).accion || '';
+
+    // ── Acción PÚBLICA (sin token): captura de ubicación del cliente ──
+    // Es el ÚNICO endpoint sin token. Solo agrega a la cola de revisión
+    // UBICACIONES_PENDIENTES; jamás escribe en CLIENTES ni en otra hoja.
+    if (accionParam === 'ubicacion') {
+      const dRaw = (e.parameter || {}).d || '{}';
+      let dataUbi;
+      try { dataUbi = JSON.parse(dRaw); } catch(err) { return jsonResponse({ ok:false, error:'JSON invalido' }); }
+      return registrarUbicacionPendiente(dataUbi);
+    }
+
     const token = (e.parameter || {}).token || (e.parameter || {}).t;
     if (token !== TOKEN_ESPERADO) return jsonResponse({ ok:false, error:'Token invalido' });
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const accionParam = (e.parameter || {}).accion || '';
 
     if (accionParam === 'cliente') {
       const dRaw = (e.parameter || {}).d || '{}';
@@ -316,6 +330,61 @@ function cambiarMetodoPago(p) {
     logSh.getRange(logFila, 8).setNumberFormat('$#,##0.00');
 
     return jsonResponse({ ok:true, metodoAnterior:metodoAnterior, metodoNuevo:nuevoMetodo, repartidor:repartidor });
+  } finally { lock.releaseLock(); }
+}
+
+// ── Captura PÚBLICA de ubicación → cola de revisión ──────────
+// Endpoint público (sin token). Por seguridad SOLO hace APPEND a la hoja
+// UBICACIONES_PENDIENTES, con límites de longitud y validación mínima.
+// Diana revisa y aprueba a mano; nada llega a CLIENTES sin su visto bueno.
+function registrarUbicacionPendiente(p) {
+  function clip(v, n) {
+    var s = String(v == null ? '' : v).trim().slice(0, n);
+    if (/^[=+\-@]/.test(s)) s = "'" + s;   // anti formula-injection: fuerza texto literal en el Sheet
+    return s;
+  }
+  const nombre     = clip(p.nombre, 80);
+  const telefono   = clip(p.telefono, 25);
+  const empresa    = clip(p.empresa, 100);    // nombre de empresa/edificio (vacío en casas)
+  const direccion  = clip(p.direccion, 150);  // dirección escrita (respaldo del pin)
+  const referencia = clip(p.referencia, 250);
+  const tipo       = clip(p.tipo, 20);         // "Casa" u "Oficina"
+
+  var lat = parseFloat(p.lat), lng = parseFloat(p.lng);
+  var coords = '', mapsLink = '';
+  if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+    lat = Math.round(lat * 1e6) / 1e6;
+    lng = Math.round(lng * 1e6) / 1e6;
+    coords   = lat + ',' + lng;
+    mapsLink = 'https://www.google.com/maps?q=' + lat + ',' + lng;
+  }
+
+  if (!nombre || !telefono)              return jsonResponse({ ok:false, error:'Falta nombre o telefono' });
+  if (!coords && !direccion && !empresa) return jsonResponse({ ok:false, error:'Falta la ubicacion (pin del mapa o direccion)' });
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch(e) { return jsonResponse({ ok:false, error:'Sistema ocupado' }); }
+  try {
+    var sh = ss.getSheetByName('UBICACIONES_PENDIENTES');
+    if (!sh) {
+      sh = ss.insertSheet('UBICACIONES_PENDIENTES');
+      sh.getRange(1, 1, 1, 10).setValues([[
+        'Recibido', 'Tipo', 'Nombre', 'Telefono', 'Empresa / edificio',
+        'Dirección', 'Referencia', 'Coordenadas', 'Mapa', 'Estado'
+      ]]);
+      sh.getRange(1, 1, 1, 10).setFontWeight('bold');
+      sh.setFrozenRows(1);
+    }
+    const fila = sh.getLastRow() + 1;
+    sh.getRange(fila, 1, 1, 10).setValues([[
+      new Date(), tipo, nombre, telefono, empresa, direccion, referencia, coords, mapsLink, 'Pendiente'
+    ]]);
+    sh.getRange(fila, 1).setNumberFormat('dd/MM/yyyy HH:mm');
+    return jsonResponse({ ok:true });
+  } catch(err) {
+    Logger.log('registrarUbicacionPendiente ERROR: ' + (err && err.stack ? err.stack : err));
+    return jsonResponse({ ok:false, error:'No se pudo guardar' });
   } finally { lock.releaseLock(); }
 }
 
