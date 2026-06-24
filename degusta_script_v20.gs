@@ -241,7 +241,7 @@ function doGet(e) {
       .map(function(r){ return { nombre:String(r[0]||'').trim(), precio:Number(r[1])||0 }; });
 
     const cfg = ss.getSheetByName('CONFIG');
-    const metodosPago = cfg.getRange('B5:B6').getValues().flat()
+    const metodosPago = cfg.getRange('B5:B7').getValues().flat()   // B7 = "Por cobrar" (cliente paga después)
       .map(function(v){ return String(v||'').trim(); }).filter(Boolean);
     const estados = cfg.getRange('B8:B12').getValues().flat()
       .map(function(v){ return String(v||'').trim(); }).filter(Boolean);

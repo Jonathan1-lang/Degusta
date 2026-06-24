@@ -459,13 +459,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         <textarea id="fNotaEntrega" placeholder="Tocar el timbre, dejar con el guardia..."></textarea>
       </div>
       <div class="field">
-        <label>Cambios del pedido <span style="font-weight:400;color:var(--tx3)">(si se modifica después)</span></label>
-        <textarea id="fCambios" placeholder="Agregar Sopa, quitar Pechuga, cambiar cantidad..."></textarea>
-      </div>
-      <div class="field">
         <label>Delivery ($)</label>
         <input type="number" id="fDelivery" value="0" min="0" step="0.5">
       </div>
+      <!-- Nota de cambios: se gestiona desde Cocina ("Nota de cambios").
+           Oculto aquí para que "Editar pedido" preserve el valor existente. -->
+      <input type="hidden" id="fCambios">
     </div>
 
     <button class="btn-primary" id="btnPedido" onclick="submitPedido()">
@@ -627,7 +626,9 @@ let WTOK = sessionStorage.getItem(SS_TOK) || "";
 let catLoaded = false, catLoading = false;
 let CAT_PLATOS = [], CAT_EXTRAS = [], CAT_CLIENTES = [], CAT_PAGOS = [], CAT_ESTADOS = [], CAT_REPARTIDORES = [];
 let pCnt = 1, eCnt = 1;
-const DEMO_MODE = false; // este mockup usa datos simulados para visualizar el diseño
+// Demo (datos simulados) SOLO en preview local. En producción (GitHub Pages,
+// hostname jonathan1-lang.github.io) queda false → usa el backend real.
+const DEMO_MODE = (location.hostname === "localhost" || location.hostname === "127.0.0.1");
 
 const acD = {}, acI = {};
 let acActive = null, acTimers = {};
@@ -635,8 +636,8 @@ let acActive = null, acTimers = {};
 // ─── DATOS DEMO ──────────────────────────────────────
 const DEMO_PLATOS = ["Pupusas revueltas (3u)", "Pollo en salsa de panela", "Casamiento con carne deshebrada"];
 const DEMO_EXTRAS = ["Curtido extra", "Gaseosa 1.5L", "Tortillas (5u)"];
-const DEMO_PAGOS = ["Efectivo", "Transferencia"];
-const DEMO_ESTADOS = ["Preparando", "En camino", "Entregado", "Cancelado", "Por cobrar"];
+const DEMO_PAGOS = ["Efectivo", "Transferencia", "Por cobrar"];
+const DEMO_ESTADOS = ["Preparando", "En camino", "Entregado", "Cancelado"];
 const DEMO_CLIENTES_FULL = [
   {id:"CLI-001",nombre:"María Hernández",telefono:"7281 4420",direccion:"Col. Escalón, pje. 4 #12",notas:"Toca el timbre dos veces",pedidos:14},
   {id:"CLI-002",nombre:"Carlos Funes",telefono:"7045 9981",direccion:"Av. Bernal, casa azul",notas:"",pedidos:7},
@@ -997,9 +998,27 @@ function submitPedido() {
 
   if (DEMO_MODE) {
     setTimeout(function(){
-      showMsg("msgPedido", "ok", (esEdicion ? "Pedido actualizado" : "Pedido #056 registrado para " + esc(cliente)) + " (demostración, no se guardó).");
-      resetPedido();
-      invalidarVistas();
+      if (esEdicion) {
+        var item = DEMO_COCINA.find(function(x){ return x.uuid === _editPedido.uuid; });
+        if (item) {
+          item.plato1=payload.plato1; item.cant1=payload.cant1;
+          item.plato2=payload.plato2; item.cant2=payload.cant2;
+          item.plato3=payload.plato3; item.cant3=payload.cant3;
+          item.extra1=payload.extra1; item.cantE1=payload.cantE1;
+          item.extra2=payload.extra2; item.cantE2=payload.cantE2;
+          item.extra3=payload.extra3; item.cantE3=payload.cantE3;
+          item.nota=payload.notaCocina; item.notaCocina=payload.notaCocina;
+          item.cambios=payload.cambios; item.delivery=payload.delivery;
+        }
+        resetPedido();
+        invalidarVistas();
+        goTab("cocina"); loadCocina();
+        showMsg("msgCocina", "ok", "Pedido actualizado (demostración).");
+      } else {
+        showMsg("msgPedido", "ok", "Pedido #056 registrado para " + esc(cliente) + " (demostración, no se guardó).");
+        resetPedido();
+        invalidarVistas();
+      }
       btn.disabled = false; sp.classList.remove("on");
     }, 650);
     return;
@@ -1420,7 +1439,7 @@ function editarPedido(btn) {
   if (p.extra2) { addE(); acSel("e2", p.extra2); document.getElementById("ce2").value = p.cantE2 || 1; }
   if (p.extra3) { addE(); acSel("e3", p.extra3); document.getElementById("ce3").value = p.cantE3 || 1; }
 
-  document.getElementById("fNotaCocina").value = p.notaCocina || "";
+  document.getElementById("fNotaCocina").value = p.notaCocina || p.nota || "";
   document.getElementById("fCambios").value    = p.cambios || "";
   document.getElementById("fDelivery").value   = p.delivery || 0;
   if (p.metodoPago) document.getElementById("fPago").value = p.metodoPago; // solo para pasar validación; no se reescribe
