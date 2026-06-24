@@ -35,6 +35,14 @@ function jsonResponse(obj) {
 function fmtHora(v)  { return (v instanceof Date) ? Utilities.formatDate(v, Session.getScriptTimeZone(), 'HH:mm')       : String(v||''); }
 function fmtFecha(v) { return (v instanceof Date) ? Utilities.formatDate(v, Session.getScriptTimeZone(), 'dd/MM/yyyy') : String(v||''); }
 
+// Saneo anti formula-injection: prefija ' a un texto que empiece con =+-@
+// para que el Sheet lo trate como literal y no lo evalúe como fórmula.
+function sanea(v) {
+  var s = String(v == null ? '' : v).trim();
+  if (/^[=+\-@]/.test(s)) s = "'" + s;
+  return s;
+}
+
 // ── Dashboard: trigger cada minuto (sin cambios vs v17.1) ──────
 function actualizarResumenDiario() {
   try {
@@ -145,13 +153,27 @@ function doGet(e) {
       return cambiarMetodoPago(dataPago);
     }
 
+    if (accionParam === 'cambios') {
+      const dRaw = (e.parameter || {}).d || '{}';
+      let dataCambios;
+      try { dataCambios = JSON.parse(dRaw); } catch(err) { return jsonResponse({ ok:false, error:'JSON invalido' }); }
+      return cambiarCambiosPedido(dataCambios);
+    }
+
+    if (accionParam === 'editar') {
+      const dRaw = (e.parameter || {}).d || '{}';
+      let dataEdit;
+      try { dataEdit = JSON.parse(dRaw); } catch(err) { return jsonResponse({ ok:false, error:'JSON invalido' }); }
+      return editarPedido(dataEdit);
+    }
+
     const vista = (e.parameter || {}).vista || '';
 
     if (vista === 'cocina') {
       const sh   = ss.getSheetByName('PEDIDOS');
       const last = sh.getLastRow();
       if (last < 2) return jsonResponse({ ok:true, pedidos:[] });
-      const rows = sh.getRange(2, 1, last-1, 33).getValues();
+      const rows = sh.getRange(2, 1, last-1, 34).getValues();
       const out  = [];
       rows.forEach(function(r) {
         const cliente = String(r[3]||'').trim();
@@ -168,6 +190,7 @@ function doGet(e) {
           extra3:String(r[14]||''), cantE3:r[15],
           metodoPago:String(r[25]||''), estado:est,
           notaCocina:String(r[27]||''),
+          cambios:String(r[33]||''),
           delivery:Number(r[31])||0 });
       });
       return jsonResponse({ ok:true, pedidos:out });
@@ -218,7 +241,7 @@ function doGet(e) {
       .map(function(r){ return { nombre:String(r[0]||'').trim(), precio:Number(r[1])||0 }; });
 
     const cfg = ss.getSheetByName('CONFIG');
-    const metodosPago = cfg.getRange('B5:B6').getValues().flat()
+    const metodosPago = cfg.getRange('B5:B7').getValues().flat()   // B7 = "Por cobrar" (cliente paga después)
       .map(function(v){ return String(v||'').trim(); }).filter(Boolean);
     const estados = cfg.getRange('B8:B12').getValues().flat()
       .map(function(v){ return String(v||'').trim(); }).filter(Boolean);
@@ -247,6 +270,8 @@ function doPost(e) {
     if (accion === 'cliente') return registrarCliente(data);
     if (accion === 'estado')  return cambiarEstadoPedido(data);
     if (accion === 'pago')    return cambiarMetodoPago(data);
+    if (accion === 'cambios') return cambiarCambiosPedido(data);
+    if (accion === 'editar')  return editarPedido(data);
     return registrarPedido(data);
   } catch(err) {
     return jsonResponse({ ok:false, error:err.message });
@@ -330,6 +355,72 @@ function cambiarMetodoPago(p) {
     logSh.getRange(logFila, 8).setNumberFormat('$#,##0.00');
 
     return jsonResponse({ ok:true, metodoAnterior:metodoAnterior, metodoNuevo:nuevoMetodo, repartidor:repartidor });
+  } finally { lock.releaseLock(); }
+}
+
+// ── Editar pedido (reescribe items E-P + nota cocina/delivery/cambios) ──
+// NO toca: cliente (D), fecha/hora (B/C), pago (Z), estado (AA), AC, AG.
+// El total (col Y) es fórmula → se recalcula solo con los items nuevos.
+function editarPedido(p) {
+  const uuid = String(p.uuid || '').trim();
+  const id   = String(p.id   || '').trim();
+  if (!uuid && !id) return jsonResponse({ ok:false, error:'Falta identificador del pedido' });
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sh = ss.getSheetByName('PEDIDOS');
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(15000); } catch(e) { return jsonResponse({ ok:false, error:'Sistema ocupado' }); }
+  try {
+    const last = sh.getLastRow();
+    if (last < 2) return jsonResponse({ ok:false, error:'No hay pedidos' });
+    const ids   = sh.getRange(2, 1,  last-1, 1).getValues();
+    const uuids = sh.getRange(2, 33, last-1, 1).getValues();
+    let fila = -1;
+    if (uuid) { for (var i=0; i<uuids.length; i++) { if (String(uuids[i][0]||'').trim()===uuid) { fila=i+2; break; } } }
+    if (fila===-1 && id) { for (var j=0; j<ids.length; j++) { if (String(ids[j][0]||'').trim()===id) { fila=j+2; break; } } }
+    if (fila===-1) return jsonResponse({ ok:false, error:'Pedido no encontrado' });
+    if (!String(p.plato1||'').trim()) return jsonResponse({ ok:false, error:'El pedido necesita al menos un plato' });
+
+    function num(v){ var n = parseFloat(v); return isNaN(n) ? '' : n; }
+    // E–P: platos/extras + cantidades (12 columnas desde la col 5)
+    sh.getRange(fila, 5, 1, 12).setValues([[
+      String(p.plato1||''), num(p.cant1),
+      String(p.plato2||''), p.plato2 ? num(p.cant2) : '',
+      String(p.plato3||''), p.plato3 ? num(p.cant3) : '',
+      String(p.extra1||''), p.extra1 ? num(p.cantE1) : '',
+      String(p.extra2||''), p.extra2 ? num(p.cantE2) : '',
+      String(p.extra3||''), p.extra3 ? num(p.cantE3) : ''
+    ]]);
+    sh.getRange(fila, 28).setValue(sanea(p.notaCocina));    // AB Nota cocina
+    sh.getRange(fila, 32).setValue(num(p.delivery)||0);     // AF Delivery
+    sh.getRange(fila, 34).setValue(sanea(p.cambios));       // AH Cambios
+    const idReal = String((ids[fila-2]||[''])[0]||id).trim();
+    return jsonResponse({ ok:true, id:idReal, uuid:uuid, fila:fila });
+  } finally { lock.releaseLock(); }
+}
+
+// ── Cambiar cambios del pedido (col AH) ─────────────────────────
+function cambiarCambiosPedido(p) {
+  const uuid    = String(p.uuid || '').trim();
+  const id      = String(p.id   || '').trim();
+  const cambios = sanea(p.cambios);
+  if (!uuid && !id) return jsonResponse({ ok:false, error:'Falta identificador del pedido' });
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sh = ss.getSheetByName('PEDIDOS');
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch(e) { return jsonResponse({ ok:false, error:'Sistema ocupado' }); }
+  try {
+    const last = sh.getLastRow();
+    if (last < 2) return jsonResponse({ ok:false, error:'No hay pedidos' });
+    const ids   = sh.getRange(2, 1,  last-1, 1).getValues();
+    const uuids = sh.getRange(2, 33, last-1, 1).getValues();
+    let fila = -1;
+    if (uuid) { for (var i=0; i<uuids.length; i++) { if (String(uuids[i][0]||'').trim()===uuid) { fila=i+2; break; } } }
+    if (fila===-1 && id) { for (var j=0; j<ids.length; j++) { if (String(ids[j][0]||'').trim()===id) { fila=j+2; break; } } }
+    if (fila===-1) return jsonResponse({ ok:false, error:'Pedido no encontrado' });
+    sh.getRange(fila, 34).setValue(cambios);   // col AH
+    return jsonResponse({ ok:true, fila:fila, cambios:cambios });
   } finally { lock.releaseLock(); }
 }
 
@@ -483,6 +574,7 @@ function registrarPedido(p) {
     w(30, String(p.notaEntrega||''));                       // AD Nota entrega
     w(32, num(p.delivery)||0);                              // AF Delivery
     w(33, uuid);                                            // AG UUID
+    w(34, sanea(p.cambios));                                // AH Cambios del pedido
     return jsonResponse({ ok:true, id:id, uuid:uuid, timestamp:now.toISOString() });
   } catch(err) {
     Logger.log('registrarPedido ERROR: ' + (err && err.stack ? err.stack : err));
