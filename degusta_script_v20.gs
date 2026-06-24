@@ -160,6 +160,13 @@ function doGet(e) {
       return cambiarCambiosPedido(dataCambios);
     }
 
+    if (accionParam === 'editar') {
+      const dRaw = (e.parameter || {}).d || '{}';
+      let dataEdit;
+      try { dataEdit = JSON.parse(dRaw); } catch(err) { return jsonResponse({ ok:false, error:'JSON invalido' }); }
+      return editarPedido(dataEdit);
+    }
+
     const vista = (e.parameter || {}).vista || '';
 
     if (vista === 'cocina') {
@@ -264,6 +271,7 @@ function doPost(e) {
     if (accion === 'estado')  return cambiarEstadoPedido(data);
     if (accion === 'pago')    return cambiarMetodoPago(data);
     if (accion === 'cambios') return cambiarCambiosPedido(data);
+    if (accion === 'editar')  return editarPedido(data);
     return registrarPedido(data);
   } catch(err) {
     return jsonResponse({ ok:false, error:err.message });
@@ -347,6 +355,47 @@ function cambiarMetodoPago(p) {
     logSh.getRange(logFila, 8).setNumberFormat('$#,##0.00');
 
     return jsonResponse({ ok:true, metodoAnterior:metodoAnterior, metodoNuevo:nuevoMetodo, repartidor:repartidor });
+  } finally { lock.releaseLock(); }
+}
+
+// ── Editar pedido (reescribe items E-P + nota cocina/delivery/cambios) ──
+// NO toca: cliente (D), fecha/hora (B/C), pago (Z), estado (AA), AC, AG.
+// El total (col Y) es fórmula → se recalcula solo con los items nuevos.
+function editarPedido(p) {
+  const uuid = String(p.uuid || '').trim();
+  const id   = String(p.id   || '').trim();
+  if (!uuid && !id) return jsonResponse({ ok:false, error:'Falta identificador del pedido' });
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sh = ss.getSheetByName('PEDIDOS');
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(15000); } catch(e) { return jsonResponse({ ok:false, error:'Sistema ocupado' }); }
+  try {
+    const last = sh.getLastRow();
+    if (last < 2) return jsonResponse({ ok:false, error:'No hay pedidos' });
+    const ids   = sh.getRange(2, 1,  last-1, 1).getValues();
+    const uuids = sh.getRange(2, 33, last-1, 1).getValues();
+    let fila = -1;
+    if (uuid) { for (var i=0; i<uuids.length; i++) { if (String(uuids[i][0]||'').trim()===uuid) { fila=i+2; break; } } }
+    if (fila===-1 && id) { for (var j=0; j<ids.length; j++) { if (String(ids[j][0]||'').trim()===id) { fila=j+2; break; } } }
+    if (fila===-1) return jsonResponse({ ok:false, error:'Pedido no encontrado' });
+    if (!String(p.plato1||'').trim()) return jsonResponse({ ok:false, error:'El pedido necesita al menos un plato' });
+
+    function num(v){ var n = parseFloat(v); return isNaN(n) ? '' : n; }
+    // E–P: platos/extras + cantidades (12 columnas desde la col 5)
+    sh.getRange(fila, 5, 1, 12).setValues([[
+      String(p.plato1||''), num(p.cant1),
+      String(p.plato2||''), p.plato2 ? num(p.cant2) : '',
+      String(p.plato3||''), p.plato3 ? num(p.cant3) : '',
+      String(p.extra1||''), p.extra1 ? num(p.cantE1) : '',
+      String(p.extra2||''), p.extra2 ? num(p.cantE2) : '',
+      String(p.extra3||''), p.extra3 ? num(p.cantE3) : ''
+    ]]);
+    sh.getRange(fila, 28).setValue(sanea(p.notaCocina));    // AB Nota cocina
+    sh.getRange(fila, 32).setValue(num(p.delivery)||0);     // AF Delivery
+    sh.getRange(fila, 34).setValue(sanea(p.cambios));       // AH Cambios
+    const idReal = String((ids[fila-2]||[''])[0]||id).trim();
+    return jsonResponse({ ok:true, id:idReal, uuid:uuid, fila:fila });
   } finally { lock.releaseLock(); }
 }
 

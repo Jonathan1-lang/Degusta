@@ -209,6 +209,8 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 .ocard-extras{color:var(--tx3);font-size:13px}
 .ocard-nota{font-size:12.5px;color:var(--am-tx);background:var(--am-bg);border-radius:7px;padding:8px 10px;margin-bottom:9px;line-height:1.5}
 .ocard-cambios{font-size:13px;color:#fff;background:var(--ac);border-radius:7px;padding:10px 10px;margin-bottom:9px;line-height:1.5;border-left:4px solid var(--ac2)}
+.ocard-acciones{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+.ocard-acciones .btn-outline-sm{flex:1;min-width:130px}
 .ocard-meta{font-size:12.5px;color:var(--tx3);margin-bottom:9px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .ocard-dir{font-size:13px;color:var(--tx);background:var(--bg3);border:1px solid var(--bdr);border-radius:7px;padding:8px 10px;margin-bottom:9px;display:flex;align-items:flex-start;gap:6px;line-height:1.45}
 .ocard-cobrar{display:flex;align-items:center;justify-content:space-between;background:var(--gr-bg);border:1px solid rgba(91,117,83,.25);border-radius:7px;padding:8px 10px;margin-bottom:9px;gap:8px}
@@ -959,7 +961,7 @@ function submitPedido() {
   var pago = document.getElementById("fPago").value;
   if (!cliente) { showMsg("msgPedido","er","Selecciona o escribe un cliente."); return; }
   if (!plato1) { showMsg("msgPedido","er","El Plato 1 es obligatorio."); return; }
-  if (!pago) { showMsg("msgPedido","er","Selecciona un método de pago."); return; }
+  if (!pago && !_editPedido) { showMsg("msgPedido","er","Selecciona un método de pago."); return; }  // al editar no se cambia el pago
 
   var uuid;
   if (window.crypto && window.crypto.randomUUID) { uuid = crypto.randomUUID(); }
@@ -981,34 +983,51 @@ function submitPedido() {
     delivery: parseFloat(document.getElementById("fDelivery").value) || 0
   };
 
+  var esEdicion = !!_editPedido;
+  if (esEdicion) {
+    payload.accion = "editar";
+    payload.uuid = _editPedido.uuid;
+    payload.id = _editPedido.id;
+  }
+
   var btn = document.getElementById("btnPedido");
   var sp  = document.getElementById("spinPed");
   var txt = document.getElementById("spinPedTxt");
-  btn.disabled = true; sp.classList.add("on"); txt.textContent = "Registrando...";
+  btn.disabled = true; sp.classList.add("on"); txt.textContent = esEdicion ? "Guardando..." : "Registrando...";
 
   if (DEMO_MODE) {
     setTimeout(function(){
-      showMsg("msgPedido", "ok", "Pedido #056 registrado para " + esc(cliente) + " (demostración, no se guardó).");
+      showMsg("msgPedido", "ok", (esEdicion ? "Pedido actualizado" : "Pedido #056 registrado para " + esc(cliente)) + " (demostración, no se guardó).");
       resetPedido();
       invalidarVistas();
-      btn.disabled = false; sp.classList.remove("on"); txt.textContent = "Registrar pedido";
+      btn.disabled = false; sp.classList.remove("on");
     }, 650);
     return;
   }
 
-  apiPOST("pedido", payload)
+  apiPOST(esEdicion ? "editar" : "pedido", payload)
     .then(function(res) {
       var idMsg = res.id ? " #" + res.id : "";
-      showMsg("msgPedido", "ok", "Pedido" + idMsg + " registrado para " + esc(cliente));
-      resetPedido();
-      invalidarVistas();
-      if (cliente && CAT_CLIENTES.indexOf(cliente) < 0) {
-        CAT_CLIENTES.push(cliente);
-        acInit("cli", CAT_CLIENTES.map(function(c){ return {label:c, value:c}; }));
+      if (esEdicion) {
+        resetPedido();           // limpia y sale del modo edición
+        invalidarVistas();
+        goTab("cocina"); loadCocina();
+        showMsg("msgCocina", "ok", "Pedido" + idMsg + " actualizado. El total se recalculó automáticamente.");
+      } else {
+        showMsg("msgPedido", "ok", "Pedido" + idMsg + " registrado para " + esc(cliente));
+        resetPedido();
+        invalidarVistas();
+        if (cliente && CAT_CLIENTES.indexOf(cliente) < 0) {
+          CAT_CLIENTES.push(cliente);
+          acInit("cli", CAT_CLIENTES.map(function(c){ return {label:c, value:c}; }));
+        }
       }
     })
-    .catch(function(e) { showMsg("msgPedido", "er", esc(e.message || "Error al registrar")); })
-    .finally(function() { btn.disabled = false; sp.classList.remove("on"); txt.textContent = "Registrar pedido"; });
+    .catch(function(e) { showMsg("msgPedido", "er", esc(e.message || (esEdicion ? "Error al actualizar" : "Error al registrar"))); })
+    .finally(function() {
+      btn.disabled = false; sp.classList.remove("on");
+      txt.textContent = _editPedido ? ("Guardar cambios del pedido #" + (_editPedido.id||"")) : "Registrar pedido";
+    });
 }
 
 function resetPedido() {
@@ -1023,6 +1042,10 @@ function resetPedido() {
   document.getElementById("fNotaEntrega").value = "";
   document.getElementById("fCambios").value = "";
   document.getElementById("fDelivery").value = 0;
+  // Salir del modo edición
+  _editPedido = null;
+  var cliInp = document.getElementById("ai-cli"); if (cliInp) cliInp.disabled = false;
+  var pedTxt = document.getElementById("spinPedTxt"); if (pedTxt) pedTxt.textContent = "Registrar pedido";
 }
 
 // ─── COCINA MODULE ───────────────────────────────────
@@ -1049,11 +1072,15 @@ function renderResumenCocina(pedidos) {
   box.style.display = "block";
 }
 
+let COCINA_DATA = [];   // pedidos activos de la última carga (para editar)
+let _editPedido = null; // {uuid,id,cliente} cuando el formulario está en modo edición
+
 function loadCocina() {
   var cont = document.getElementById("cocinaCont");
   var rb = document.getElementById("cocinaResumen"); if (rb) rb.style.display = "none";
   if (DEMO_MODE) {
     var activos = DEMO_COCINA.filter(function(p){ return p.estado !== "Entregado" && p.estado !== "Cancelado"; });
+    COCINA_DATA = activos;
     cont.innerHTML = activos.length ? activos.map(function(p){ return renderCard(p, "cocina"); }).join("") : emptyHTML("No hay pedidos activos");
     renderResumenCocina(activos);
     cont.dataset.loaded = "1";
@@ -1065,6 +1092,7 @@ function loadCocina() {
     .then(function(data) {
       if (!data.pedidos) { cont.innerHTML = proxHTML("cocina"); showMsg("msgCocina","wa","Backend aún no soporta vista=cocina"); return; }
       var activos = data.pedidos.filter(function(p){ return p.estado !== "Entregado" && p.estado !== "Cancelado"; });
+      COCINA_DATA = activos;
       cont.innerHTML = activos.length ? activos.map(function(p){ return renderCard(p, "cocina"); }).join("") : emptyHTML("No hay pedidos activos");
       renderResumenCocina(activos);
       cont.dataset.loaded = "1";
@@ -1166,13 +1194,16 @@ function renderCard(p, vista) {
   if (notaCard) html += "<div class=\"ocard-nota\">" + esc(notaCard) + "</div>";
   if (vista === "cocina" && p.cambios) html += "<div class=\"ocard-cambios\">🔔 <strong>Cambios:</strong> " + esc(p.cambios) + "</div>";
   if (vista === "cocina") {
-    var btnTxtCambios = p.cambios ? "✎ Editar cambios" : "✎ Agregar cambios";
-    html += "<button class=\"btn-outline-sm\""
-      + " data-uuid=\"" + esc(p.uuid||"") + "\""
-      + " data-id=\""   + esc(p.id||"")   + "\""
-      + " data-cli=\""  + esc(p.cliente||"") + "\""
-      + " data-cambios=\"" + esc(p.cambios||"") + "\""
-      + " onclick=\"abrirEditarCambios(this)\">" + btnTxtCambios + "</button>";
+    var btnTxtCambios = p.cambios ? "✎ Editar nota de cambios" : "✎ Nota de cambios";
+    html += "<div class=\"ocard-acciones\">"
+      + "<button class=\"btn-outline-sm\" data-uuid=\"" + esc(p.uuid||"") + "\" onclick=\"editarPedido(this)\">✎ Editar pedido</button>"
+      + "<button class=\"btn-outline-sm\""
+      +   " data-uuid=\"" + esc(p.uuid||"") + "\""
+      +   " data-id=\""   + esc(p.id||"")   + "\""
+      +   " data-cli=\""  + esc(p.cliente||"") + "\""
+      +   " data-cambios=\"" + esc(p.cambios||"") + "\""
+      +   " onclick=\"abrirEditarCambios(this)\">" + btnTxtCambios + "</button>"
+      + "</div>";
   }
   if (vista === "repartidor" && p.estado === "En camino") {
     html += "<div class=\"ocard-cobrar\"><span>Cobrar: <strong>$" + (p.total||0).toFixed(2) + "</strong></span>"
@@ -1370,6 +1401,36 @@ function confirmarCambioPago() {
     .finally(function() {
       btn.disabled = false; sp.classList.remove("on"); txt.textContent = "Confirmar cambio";
     });
+}
+
+// Reabre un pedido de Cocina en el formulario, en modo edición.
+function editarPedido(btn) {
+  var uuid = btn.dataset.uuid;
+  var p = (COCINA_DATA || []).find(function(x){ return x.uuid === uuid; });
+  if (!p) { showMsg("msgCocina","er","No se encontró el pedido para editar. Recarga Cocina."); return; }
+
+  goTab("pedido");
+  resetPedido();                 // limpia y sale de cualquier edición previa
+
+  acSel("cli", p.cliente);
+  acSel("p1", p.plato1); document.getElementById("cp1").value = p.cant1 || 1;
+  if (p.plato2) { addP(); acSel("p2", p.plato2); document.getElementById("cp2").value = p.cant2 || 1; }
+  if (p.plato3) { addP(); acSel("p3", p.plato3); document.getElementById("cp3").value = p.cant3 || 1; }
+  if (p.extra1) { acSel("e1", p.extra1); document.getElementById("ce1").value = p.cantE1 || 1; }
+  if (p.extra2) { addE(); acSel("e2", p.extra2); document.getElementById("ce2").value = p.cantE2 || 1; }
+  if (p.extra3) { addE(); acSel("e3", p.extra3); document.getElementById("ce3").value = p.cantE3 || 1; }
+
+  document.getElementById("fNotaCocina").value = p.notaCocina || "";
+  document.getElementById("fCambios").value    = p.cambios || "";
+  document.getElementById("fDelivery").value   = p.delivery || 0;
+  if (p.metodoPago) document.getElementById("fPago").value = p.metodoPago; // solo para pasar validación; no se reescribe
+
+  // Cliente bloqueado: editar no cambia de quién es el pedido
+  var cliInp = document.getElementById("ai-cli"); if (cliInp) cliInp.disabled = true;
+
+  _editPedido = { uuid: p.uuid, id: p.id, cliente: p.cliente };
+  document.getElementById("spinPedTxt").textContent = "Guardar cambios del pedido #" + (p.id || "");
+  showMsg("msgPedido","wa","Editando pedido #" + esc(p.id||"") + " de " + esc(p.cliente) + ". Ajusta los platos y guarda — el total se recalcula solo. (Para cambiar el pago usa el botón en Envíos.)");
 }
 
 let _cambiosModal = {};
