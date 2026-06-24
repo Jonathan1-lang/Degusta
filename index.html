@@ -208,6 +208,7 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 .ocard-items{font-size:14px;color:var(--tx2);margin-bottom:8px;line-height:1.65}
 .ocard-extras{color:var(--tx3);font-size:13px}
 .ocard-nota{font-size:12.5px;color:var(--am-tx);background:var(--am-bg);border-radius:7px;padding:8px 10px;margin-bottom:9px;line-height:1.5}
+.ocard-cambios{font-size:13px;color:#fff;background:var(--ac);border-radius:7px;padding:10px 10px;margin-bottom:9px;line-height:1.5;border-left:4px solid var(--ac2)}
 .ocard-meta{font-size:12.5px;color:var(--tx3);margin-bottom:9px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .ocard-dir{font-size:13px;color:var(--tx);background:var(--bg3);border:1px solid var(--bdr);border-radius:7px;padding:8px 10px;margin-bottom:9px;display:flex;align-items:flex-start;gap:6px;line-height:1.45}
 .ocard-cobrar{display:flex;align-items:center;justify-content:space-between;background:var(--gr-bg);border:1px solid rgba(91,117,83,.25);border-radius:7px;padding:8px 10px;margin-bottom:9px;gap:8px}
@@ -456,6 +457,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         <textarea id="fNotaEntrega" placeholder="Tocar el timbre, dejar con el guardia..."></textarea>
       </div>
       <div class="field">
+        <label>Cambios del pedido <span style="font-weight:400;color:var(--tx3)">(si se modifica después)</span></label>
+        <textarea id="fCambios" placeholder="Agregar Sopa, quitar Pechuga, cambiar cantidad..."></textarea>
+      </div>
+      <div class="field">
         <label>Delivery ($)</label>
         <input type="number" id="fDelivery" value="0" min="0" step="0.5">
       </div>
@@ -586,6 +591,21 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <span id="spinPagoTxt">Confirmar cambio</span>
     </button>
     <button class="btn-ghost" onclick="cerrarCambioPago()">Cancelar</button>
+  </div>
+</div>
+
+<!-- MODAL: editar cambios del pedido -->
+<div class="modal-overlay" id="modalEditarCambios">
+  <div class="modal-box">
+    <div class="modal-hdr"><span class="modal-ttl">Cambios del pedido</span><button class="modal-x" onclick="cerrarEditarCambios()" aria-label="Cerrar">×</button></div>
+    <div id="ecInfo" style="font-size:13.5px;color:var(--tx2);line-height:1.7;margin-bottom:16px;padding:10px 12px;background:var(--bg3);border-radius:8px;border:1px solid var(--bdr)"></div>
+    <div class="field"><label>Cambios <span style="font-weight:400;color:var(--tx3)">(agregar, quitar, cambiar cantidad...)</span></label><textarea id="ecCambios" placeholder="Agregar Sopa, quitar Pechuga..."></textarea></div>
+    <div id="msgEditarCambios" class="msg" style="margin-bottom:12px"></div>
+    <button class="btn-primary" id="btnConfirmarCambios" onclick="confirmarEditarCambios()">
+      <span class="spin" id="spinCambios"></span>
+      <span id="spinCambiosTxt">Guardar cambios</span>
+    </button>
+    <button class="btn-ghost" onclick="cerrarEditarCambios()">Cancelar</button>
   </div>
 </div>
 
@@ -957,6 +977,7 @@ function submitPedido() {
     estado: document.getElementById("fEstado").value || "Preparando",
     notaCocina: document.getElementById("fNotaCocina").value.trim(),
     notaEntrega: document.getElementById("fNotaEntrega").value.trim(),
+    cambios: document.getElementById("fCambios").value.trim(),
     delivery: parseFloat(document.getElementById("fDelivery").value) || 0
   };
 
@@ -1000,6 +1021,7 @@ function resetPedido() {
   document.getElementById("btnAddE").style.display = "";
   document.getElementById("fNotaCocina").value = "";
   document.getElementById("fNotaEntrega").value = "";
+  document.getElementById("fCambios").value = "";
   document.getElementById("fDelivery").value = 0;
 }
 
@@ -1142,6 +1164,11 @@ function renderCard(p, vista) {
   }
   var notaCard = vista === "repartidor" ? (p.notaEntrega || p.nota) : (p.notaCocina || p.nota);
   if (notaCard) html += "<div class=\"ocard-nota\">" + esc(notaCard) + "</div>";
+  if (vista === "cocina" && p.cambios) html += "<div class=\"ocard-cambios\">🔔 <strong>Cambios:</strong> " + esc(p.cambios) + "</div>";
+  if (vista === "cocina") {
+    var btnTxtCambios = p.cambios ? "✎ Editar cambios" : "✎ Agregar cambios";
+    html += "<button class=\"btn-outline-sm\" onclick=\"abrirEditarCambios('" + esc(p.uuid||"") + "','" + esc(p.id||"") + "','" + esc(p.cliente||"") + "')\">" + btnTxtCambios + "</button>";
+  }
   if (vista === "repartidor" && p.estado === "En camino") {
     html += "<div class=\"ocard-cobrar\"><span>Cobrar: <strong>$" + (p.total||0).toFixed(2) + "</strong></span>"
       + "<button class=\"btn-outline-sm\""
@@ -1337,6 +1364,39 @@ function confirmarCambioPago() {
     })
     .finally(function() {
       btn.disabled = false; sp.classList.remove("on"); txt.textContent = "Confirmar cambio";
+    });
+}
+
+let _cambiosModal = {};
+function abrirEditarCambios(uuid, id, cliente) {
+  _cambiosModal = { uuid:uuid, id:id, cliente:cliente };
+  var info = document.getElementById("ecInfo");
+  info.innerHTML = "<strong>Pedido para " + esc(cliente) + "</strong>";
+  var textarea = document.getElementById("ecCambios");
+  textarea.value = "";
+  textarea.focus();
+  hideMsg("msgEditarCambios");
+  document.getElementById("modalEditarCambios").classList.add("on");
+}
+function cerrarEditarCambios() { document.getElementById("modalEditarCambios").classList.remove("on"); _cambiosModal = {}; }
+function confirmarEditarCambios() {
+  var cambios = document.getElementById("ecCambios").value.trim();
+  var btn = document.getElementById("btnConfirmarCambios");
+  var sp  = document.getElementById("spinCambios");
+  var txt = document.getElementById("spinCambiosTxt");
+  btn.disabled = true; sp.classList.add("on"); txt.textContent = "Guardando...";
+  apiPOST("cambios", { uuid:_cambiosModal.uuid, id:_cambiosModal.id, cambios:cambios })
+    .then(function() {
+      cerrarEditarCambios();
+      invalidarVistas();
+      loadCocina();
+      showMsg("msgCocina","ok","Cambios guardados para " + esc(_cambiosModal.cliente) + ".");
+    })
+    .catch(function(e) {
+      showMsg("msgEditarCambios","er", esc(e.message||"Error al guardar cambios"));
+    })
+    .finally(function() {
+      btn.disabled = false; sp.classList.remove("on"); txt.textContent = "Guardar cambios";
     });
 }
 

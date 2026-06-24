@@ -145,13 +145,20 @@ function doGet(e) {
       return cambiarMetodoPago(dataPago);
     }
 
+    if (accionParam === 'cambios') {
+      const dRaw = (e.parameter || {}).d || '{}';
+      let dataCambios;
+      try { dataCambios = JSON.parse(dRaw); } catch(err) { return jsonResponse({ ok:false, error:'JSON invalido' }); }
+      return cambiarCambiosPedido(dataCambios);
+    }
+
     const vista = (e.parameter || {}).vista || '';
 
     if (vista === 'cocina') {
       const sh   = ss.getSheetByName('PEDIDOS');
       const last = sh.getLastRow();
       if (last < 2) return jsonResponse({ ok:true, pedidos:[] });
-      const rows = sh.getRange(2, 1, last-1, 33).getValues();
+      const rows = sh.getRange(2, 1, last-1, 34).getValues();
       const out  = [];
       rows.forEach(function(r) {
         const cliente = String(r[3]||'').trim();
@@ -168,6 +175,7 @@ function doGet(e) {
           extra3:String(r[14]||''), cantE3:r[15],
           metodoPago:String(r[25]||''), estado:est,
           notaCocina:String(r[27]||''),
+          cambios:String(r[33]||''),
           delivery:Number(r[31])||0 });
       });
       return jsonResponse({ ok:true, pedidos:out });
@@ -247,6 +255,7 @@ function doPost(e) {
     if (accion === 'cliente') return registrarCliente(data);
     if (accion === 'estado')  return cambiarEstadoPedido(data);
     if (accion === 'pago')    return cambiarMetodoPago(data);
+    if (accion === 'cambios') return cambiarCambiosPedido(data);
     return registrarPedido(data);
   } catch(err) {
     return jsonResponse({ ok:false, error:err.message });
@@ -330,6 +339,31 @@ function cambiarMetodoPago(p) {
     logSh.getRange(logFila, 8).setNumberFormat('$#,##0.00');
 
     return jsonResponse({ ok:true, metodoAnterior:metodoAnterior, metodoNuevo:nuevoMetodo, repartidor:repartidor });
+  } finally { lock.releaseLock(); }
+}
+
+// ── Cambiar cambios del pedido (col AH) ─────────────────────────
+function cambiarCambiosPedido(p) {
+  const uuid    = String(p.uuid || '').trim();
+  const id      = String(p.id   || '').trim();
+  const cambios = String(p.cambios || '').trim();
+  if (!uuid && !id) return jsonResponse({ ok:false, error:'Falta identificador del pedido' });
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sh = ss.getSheetByName('PEDIDOS');
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch(e) { return jsonResponse({ ok:false, error:'Sistema ocupado' }); }
+  try {
+    const last = sh.getLastRow();
+    if (last < 2) return jsonResponse({ ok:false, error:'No hay pedidos' });
+    const ids   = sh.getRange(2, 1,  last-1, 1).getValues();
+    const uuids = sh.getRange(2, 33, last-1, 1).getValues();
+    let fila = -1;
+    if (uuid) { for (var i=0; i<uuids.length; i++) { if (String(uuids[i][0]||'').trim()===uuid) { fila=i+2; break; } } }
+    if (fila===-1 && id) { for (var j=0; j<ids.length; j++) { if (String(ids[j][0]||'').trim()===id) { fila=j+2; break; } } }
+    if (fila===-1) return jsonResponse({ ok:false, error:'Pedido no encontrado' });
+    sh.getRange(fila, 34).setValue(cambios);   // col AH
+    return jsonResponse({ ok:true, fila:fila, cambios:cambios });
   } finally { lock.releaseLock(); }
 }
 
@@ -481,8 +515,10 @@ function registrarPedido(p) {
     // que lo autogenera desde B (fecha) y C (hora). Escribirla rompía el
     // guardado por ser celda protegida (perdía productos, pago y estado).
     w(30, String(p.notaEntrega||''));                       // AD Nota entrega
+    w(31, num(p.descuento||0));                             // AE Descuento
     w(32, num(p.delivery)||0);                              // AF Delivery
     w(33, uuid);                                            // AG UUID
+    w(34, String(p.cambios||''));                           // AH Cambios del pedido
     return jsonResponse({ ok:true, id:id, uuid:uuid, timestamp:now.toISOString() });
   } catch(err) {
     Logger.log('registrarPedido ERROR: ' + (err && err.stack ? err.stack : err));
