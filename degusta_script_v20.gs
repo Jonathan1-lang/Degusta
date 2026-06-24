@@ -35,6 +35,14 @@ function jsonResponse(obj) {
 function fmtHora(v)  { return (v instanceof Date) ? Utilities.formatDate(v, Session.getScriptTimeZone(), 'HH:mm')       : String(v||''); }
 function fmtFecha(v) { return (v instanceof Date) ? Utilities.formatDate(v, Session.getScriptTimeZone(), 'dd/MM/yyyy') : String(v||''); }
 
+// Saneo anti formula-injection: prefija ' a un texto que empiece con =+-@
+// para que el Sheet lo trate como literal y no lo evalúe como fórmula.
+function sanea(v) {
+  var s = String(v == null ? '' : v).trim();
+  if (/^[=+\-@]/.test(s)) s = "'" + s;
+  return s;
+}
+
 // ── Dashboard: trigger cada minuto (sin cambios vs v17.1) ──────
 function actualizarResumenDiario() {
   try {
@@ -346,7 +354,7 @@ function cambiarMetodoPago(p) {
 function cambiarCambiosPedido(p) {
   const uuid    = String(p.uuid || '').trim();
   const id      = String(p.id   || '').trim();
-  const cambios = String(p.cambios || '').trim();
+  const cambios = sanea(p.cambios);
   if (!uuid && !id) return jsonResponse({ ok:false, error:'Falta identificador del pedido' });
 
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -515,10 +523,9 @@ function registrarPedido(p) {
     // que lo autogenera desde B (fecha) y C (hora). Escribirla rompía el
     // guardado por ser celda protegida (perdía productos, pago y estado).
     w(30, String(p.notaEntrega||''));                       // AD Nota entrega
-    w(31, num(p.descuento||0));                             // AE Descuento
     w(32, num(p.delivery)||0);                              // AF Delivery
     w(33, uuid);                                            // AG UUID
-    w(34, String(p.cambios||''));                           // AH Cambios del pedido
+    w(34, sanea(p.cambios));                                // AH Cambios del pedido
     return jsonResponse({ ok:true, id:id, uuid:uuid, timestamp:now.toISOString() });
   } catch(err) {
     Logger.log('registrarPedido ERROR: ' + (err && err.stack ? err.stack : err));

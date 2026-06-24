@@ -1167,7 +1167,12 @@ function renderCard(p, vista) {
   if (vista === "cocina" && p.cambios) html += "<div class=\"ocard-cambios\">🔔 <strong>Cambios:</strong> " + esc(p.cambios) + "</div>";
   if (vista === "cocina") {
     var btnTxtCambios = p.cambios ? "✎ Editar cambios" : "✎ Agregar cambios";
-    html += "<button class=\"btn-outline-sm\" onclick=\"abrirEditarCambios('" + esc(p.uuid||"") + "','" + esc(p.id||"") + "','" + esc(p.cliente||"") + "')\">" + btnTxtCambios + "</button>";
+    html += "<button class=\"btn-outline-sm\""
+      + " data-uuid=\"" + esc(p.uuid||"") + "\""
+      + " data-id=\""   + esc(p.id||"")   + "\""
+      + " data-cli=\""  + esc(p.cliente||"") + "\""
+      + " data-cambios=\"" + esc(p.cambios||"") + "\""
+      + " onclick=\"abrirEditarCambios(this)\">" + btnTxtCambios + "</button>";
   }
   if (vista === "repartidor" && p.estado === "En camino") {
     html += "<div class=\"ocard-cobrar\"><span>Cobrar: <strong>$" + (p.total||0).toFixed(2) + "</strong></span>"
@@ -1368,12 +1373,12 @@ function confirmarCambioPago() {
 }
 
 let _cambiosModal = {};
-function abrirEditarCambios(uuid, id, cliente) {
-  _cambiosModal = { uuid:uuid, id:id, cliente:cliente };
+function abrirEditarCambios(btn) {
+  _cambiosModal = { uuid:btn.dataset.uuid, id:btn.dataset.id, cliente:btn.dataset.cli };
   var info = document.getElementById("ecInfo");
-  info.innerHTML = "<strong>Pedido para " + esc(cliente) + "</strong>";
+  info.innerHTML = "<strong>Pedido para " + esc(_cambiosModal.cliente) + "</strong>";
   var textarea = document.getElementById("ecCambios");
-  textarea.value = "";
+  textarea.value = btn.dataset.cambios || "";   // precarga lo existente para no borrarlo
   textarea.focus();
   hideMsg("msgEditarCambios");
   document.getElementById("modalEditarCambios").classList.add("on");
@@ -1381,6 +1386,7 @@ function abrirEditarCambios(uuid, id, cliente) {
 function cerrarEditarCambios() { document.getElementById("modalEditarCambios").classList.remove("on"); _cambiosModal = {}; }
 function confirmarEditarCambios() {
   var cambios = document.getElementById("ecCambios").value.trim();
+  var cliente = _cambiosModal.cliente;   // capturar antes de cerrar (cerrarEditarCambios resetea _cambiosModal)
   var btn = document.getElementById("btnConfirmarCambios");
   var sp  = document.getElementById("spinCambios");
   var txt = document.getElementById("spinCambiosTxt");
@@ -1390,7 +1396,7 @@ function confirmarEditarCambios() {
       cerrarEditarCambios();
       invalidarVistas();
       loadCocina();
-      showMsg("msgCocina","ok","Cambios guardados para " + esc(_cambiosModal.cliente) + ".");
+      showMsg("msgCocina","ok","Cambios guardados para " + esc(cliente) + ".");
     })
     .catch(function(e) {
       showMsg("msgEditarCambios","er", esc(e.message||"Error al guardar cambios"));
