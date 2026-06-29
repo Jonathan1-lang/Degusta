@@ -1215,7 +1215,7 @@ function renderCard(p, vista) {
   if (vista === "cocina") {
     var btnTxtCambios = p.cambios ? "✎ Editar nota de cambios" : "✎ Nota de cambios";
     html += "<div class=\"ocard-acciones\">"
-      + "<button class=\"btn-outline-sm\" data-uuid=\"" + esc(p.uuid||"") + "\" onclick=\"editarPedido(this)\">✎ Editar pedido</button>"
+      + "<button class=\"btn-outline-sm\" data-uuid=\"" + esc(p.uuid||"") + "\" data-id=\"" + esc(p.id||"") + "\" onclick=\"editarPedido(this)\">✎ Editar pedido</button>"
       + "<button class=\"btn-outline-sm\""
       +   " data-uuid=\"" + esc(p.uuid||"") + "\""
       +   " data-id=\""   + esc(p.id||"")   + "\""
@@ -1235,13 +1235,13 @@ function renderCard(p, vista) {
       + " onclick=\"abrirCambioPago(this)\">✎ Cambiar pago</button></div>";
   }
   if (p.metodoPago) html += "<div class=\"ocard-meta\"><span>" + esc(p.metodoPago) + "</span>" + (p.delivery > 0 ? "<span>· delivery $"+p.delivery+"</span>" : "") + "</div>";
-  if (vista === "cocina" && nextEst) html += "<button class=\"btn-est btn-next\" onclick=\"cambiarEstado('" + esc(p.uuid||"") + "','" + nextEst + "')\">→ Marcar " + nextEst + "</button>";
-  if (vista === "repartidor" && p.estado === "En camino") html += "<button class=\"btn-est btn-ent\" onclick=\"cambiarEstado('" + esc(p.uuid||"") + "','Entregado')\">✓ Marcar entregado</button>";
+  if (vista === "cocina" && nextEst) html += "<button class=\"btn-est btn-next\" onclick=\"cambiarEstado('" + esc(p.uuid||"") + "','" + nextEst + "','" + esc(p.id||"") + "')\">→ Marcar " + nextEst + "</button>";
+  if (vista === "repartidor" && p.estado === "En camino") html += "<button class=\"btn-est btn-ent\" onclick=\"cambiarEstado('" + esc(p.uuid||"") + "','Entregado','" + esc(p.id||"") + "')\">✓ Marcar entregado</button>";
   html += "</div>";
   return html;
 }
 
-function cambiarEstado(uuid, nuevoEstado) {
+function cambiarEstado(uuid, nuevoEstado, id) {
   if (!confirm("¿Cambiar estado a \"" + nuevoEstado + "\"?")) return;
   if (DEMO_MODE) {
     DEMO_COCINA.forEach(function(p){ if (p.uuid === uuid) p.estado = nuevoEstado; });
@@ -1251,7 +1251,7 @@ function cambiarEstado(uuid, nuevoEstado) {
     if (panel && panel.id === "panel-repartidor") loadRepartidor();
     return;
   }
-  apiPOST("estado", {uuid: uuid, estado: nuevoEstado})
+  apiPOST("estado", {uuid: uuid, id: id, estado: nuevoEstado})
     .then(function() {
       invalidarVistas();
       var panel = document.querySelector(".panel.active");
@@ -1425,7 +1425,10 @@ function confirmarCambioPago() {
 // Reabre un pedido de Cocina en el formulario, en modo edición.
 function editarPedido(btn) {
   var uuid = btn.dataset.uuid;
-  var p = (COCINA_DATA || []).find(function(x){ return x.uuid === uuid; });
+  var id   = btn.dataset.id;
+  var p = (COCINA_DATA || []).find(function(x){
+    return (uuid && x.uuid === uuid) || (id && x.id === id);
+  });
   if (!p) { showMsg("msgCocina","er","No se encontró el pedido para editar. Recarga Cocina."); return; }
 
   goTab("pedido");
