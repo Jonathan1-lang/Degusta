@@ -495,6 +495,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   <div id="repartidorCont"></div>
 </div>
 
+<!-- TAB: HISTORIAL -->
+<div class="panel" id="panel-historial">
+  <div class="section-hdr">
+    <span class="section-ttl">Historial del día</span>
+    <button class="btn-outline-sm" onclick="loadHistorial()">↻ Recargar</button>
+  </div>
+  <div id="msgHistorial" class="msg"></div>
+  <div id="historialCont"></div>
+</div>
+
 <!-- TAB 4: CLIENTES -->
 <div class="panel" id="panel-clientes">
   <div class="section-hdr">
@@ -551,6 +561,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   <button class="tab-btn active" id="tab-pedido" onclick="goTab('pedido')"><span class="ico">🛒</span><span>Pedido</span></button>
   <button class="tab-btn" id="tab-cocina" onclick="goTab('cocina')"><span class="ico">🍳</span><span>Cocina</span></button>
   <button class="tab-btn" id="tab-repartidor" onclick="goTab('repartidor')"><span class="ico">🛵</span><span>Envíos</span></button>
+  <button class="tab-btn" id="tab-historial" onclick="goTab('historial')"><span class="ico">🧾</span><span>Historial</span></button>
   <button class="tab-btn" id="tab-clientes" onclick="goTab('clientes')"><span class="ico">👥</span><span>Clientes</span></button>
   <button class="tab-btn" id="tab-config" onclick="goTab('config')"><span class="ico">⚙</span><span>Config</span></button>
 </nav>
@@ -704,13 +715,15 @@ function goTab(t) {
   document.getElementById("tab-" + t).classList.add("active");
   if (t === "cocina" && !document.getElementById("cocinaCont").dataset.loaded) loadCocina();
   if (t === "repartidor" && !document.getElementById("repartidorCont").dataset.loaded) loadRepartidor();
+  if (t === "historial" && !document.getElementById("historialCont").dataset.loaded) loadHistorial();
 }
 
-// Marca cocina/envios como "no cargadas" para que se refresquen al volver a entrar
-// (tras crear un pedido o cambiar su estado).
+// Marca cocina/envios/historial como "no cargadas" para que se refresquen al
+// volver a entrar (tras crear un pedido, cambiar su estado o su pago).
 function invalidarVistas() {
   var cc = document.getElementById("cocinaCont"); if (cc) cc.dataset.loaded = "";
   var rc = document.getElementById("repartidorCont"); if (rc) rc.dataset.loaded = "";
+  var hc = document.getElementById("historialCont"); if (hc) hc.dataset.loaded = "";
 }
 
 // ─── MESSAGES ────────────────────────────────────────
@@ -1140,8 +1153,28 @@ function loadRepartidor() {
     .catch(function(e) { cont.innerHTML = proxHTML("repartidor"); showMsg("msgRepartidor","wa","Backend no soporta vista=repartidor aún"); });
 }
 
+// ─── HISTORIAL MODULE (pedidos "Entregado" de hoy — cambiar pago tardío) ──
+function loadHistorial() {
+  var cont = document.getElementById("historialCont");
+  if (DEMO_MODE) {
+    var entregadosDemo = DEMO_COCINA.filter(function(p){ return p.estado === "Entregado"; });
+    cont.innerHTML = entregadosDemo.length ? entregadosDemo.map(function(p){ return renderCard(p, "historial"); }).join("") : emptyHTML("Aún no hay pedidos entregados hoy");
+    cont.dataset.loaded = "1";
+    return;
+  }
+  if (!WURL || !WTOK) { showMsg("msgHistorial","er","Configura la conexión primero."); return; }
+  cont.innerHTML = "<div style=\"padding:40px;text-align:center\"><div class=\"ld-big\" style=\"margin:0 auto\"></div><p style=\"color:var(--tx3);margin-top:12px\">Cargando...</p></div>";
+  apiGET({vista:"historial"})
+    .then(function(data) {
+      if (!data.pedidos) { cont.innerHTML = proxHTML("historial"); showMsg("msgHistorial","wa","Backend aún no soporta vista=historial"); return; }
+      cont.innerHTML = data.pedidos.length ? data.pedidos.map(function(p){ return renderCard(p, "historial"); }).join("") : emptyHTML("Aún no hay pedidos entregados hoy");
+      cont.dataset.loaded = "1";
+    })
+    .catch(function(e) { cont.innerHTML = proxHTML("historial"); showMsg("msgHistorial","wa","Backend no soporta vista=historial aún"); });
+}
+
 function proxHTML(vista) {
-  var label = vista === "cocina" ? "vista=cocina" : "vista=repartidor";
+  var label = vista === "cocina" ? "vista=cocina" : (vista === "historial" ? "vista=historial" : "vista=repartidor");
   return "<div class=\"prox\"><div class=\"prox-ico\">⏳</div><div class=\"prox-ttl\">Próximamente</div><div class=\"prox-sub\">El backend aún no soporta <code>?" + label + "</code>.<br>La estructura está lista para cuando se despliegue.</div></div>";
 }
 function emptyHTML(txt) {
@@ -1201,7 +1234,7 @@ function renderCard(p, vista) {
     html += "<a class=\"btn-waze\" href=\"https://waze.com/ul?q=" + encodeURIComponent(p.direccion + ", El Salvador") + "&navigate=yes\" target=\"_blank\" rel=\"noopener\">🧭 Navegar con Waze</a>";
   }
   var tn = telNorm(p.telefono);
-  if (vista === "repartidor" && tn) {
+  if ((vista === "repartidor" || vista === "historial") && tn) {
     html += "<div class=\"ocard-contacto\">"
       + "<button class=\"btn-contacto\" onclick=\"toggleContacto(this)\">📞 Contactar cliente</button>"
       + "<div class=\"contacto-opts\" style=\"display:none\">"
@@ -1209,7 +1242,7 @@ function renderCard(p, vista) {
       +   "<a class=\"c-opt c-wa\" href=\"https://wa.me/" + esc(tn) + "\" target=\"_blank\" rel=\"noopener\">💬 WhatsApp</a>"
       + "</div></div>";
   }
-  var notaCard = vista === "repartidor" ? (p.notaEntrega || p.nota) : (p.notaCocina || p.nota);
+  var notaCard = (vista === "repartidor" || vista === "historial") ? (p.notaEntrega || p.nota) : (p.notaCocina || p.nota);
   if (notaCard) html += "<div class=\"ocard-nota\">" + esc(notaCard) + "</div>";
   if (vista === "cocina" && p.cambios) html += "<div class=\"ocard-cambios\">🔔 <strong>Cambios:</strong> " + esc(p.cambios) + "</div>";
   if (vista === "cocina") {
@@ -1224,7 +1257,7 @@ function renderCard(p, vista) {
       +   " onclick=\"abrirEditarCambios(this)\">" + btnTxtCambios + "</button>"
       + "</div>";
   }
-  if (vista === "repartidor" && p.estado === "En camino") {
+  if ((vista === "repartidor" && p.estado === "En camino") || vista === "historial") {
     html += "<div class=\"ocard-cobrar\"><span>Cobrar: <strong>$" + (p.total||0).toFixed(2) + "</strong></span>"
       + "<button class=\"btn-outline-sm\""
       + " data-uuid=\"" + esc(p.uuid||"") + "\""
@@ -1249,6 +1282,7 @@ function cambiarEstado(uuid, nuevoEstado, id) {
     var panel = document.querySelector(".panel.active");
     if (panel && panel.id === "panel-cocina") loadCocina();
     if (panel && panel.id === "panel-repartidor") loadRepartidor();
+    if (panel && panel.id === "panel-historial") loadHistorial();
     return;
   }
   apiPOST("estado", {uuid: uuid, id: id, estado: nuevoEstado})
@@ -1411,8 +1445,11 @@ function confirmarCambioPago() {
     .then(function() {
       cerrarCambioPago();
       invalidarVistas();
-      loadRepartidor();
-      showMsg("msgRepartidor","ok","Pago cambiado a " + esc(nuevoMetodo) + ". Registrado en LOG_PAGOS.");
+      var panel = document.querySelector(".panel.active");
+      var msgId = "msgRepartidor";
+      if (panel && panel.id === "panel-historial") { loadHistorial(); msgId = "msgHistorial"; }
+      else { loadRepartidor(); }
+      showMsg(msgId,"ok","Pago cambiado a " + esc(nuevoMetodo) + ". Registrado en LOG_PAGOS.");
     })
     .catch(function(e) {
       showMsg("msgCambioPago","er", esc(e.message||"Error al cambiar pago"));
