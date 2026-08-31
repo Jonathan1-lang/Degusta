@@ -314,7 +314,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     </div>
     <div class="field">
       <label>Token de acceso</label>
-      <input type="text" id="cfgTok0" placeholder="dgst-..." autocomplete="off">
+      <input type="password" id="cfgTok0" placeholder="dgst-..." autocomplete="new-password" spellcheck="false">
     </div>
     <button class="btn-primary" onclick="saveConfig0()">
       <span class="spin" id="spin0"></span>
@@ -532,7 +532,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     </div>
     <div class="field">
       <label>Token de acceso</label>
-      <input type="text" id="cfgTok" placeholder="dgst-..." autocomplete="off" spellcheck="false">
+      <input type="password" id="cfgTok" placeholder="Token requerido" autocomplete="new-password" spellcheck="false">
     </div>
     <button class="btn-primary" onclick="saveConfig()">
       <span class="spin" id="spinCfg"></span>
@@ -549,7 +549,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     <div style="font-size:13px;color:var(--tx3);line-height:2">
       <div><strong style="color:var(--tx2)">App:</strong> Degusta v3.1</div>
       <div><strong style="color:var(--tx2)">Diseño:</strong> Pizarra del día</div>
-      <div><strong style="color:var(--tx2)">Datos:</strong> sessionStorage (se borra al cerrar)</div>
+      <div><strong style="color:var(--tx2)">URL:</strong> sessionStorage</div>
+      <div><strong style="color:var(--tx2)">Token:</strong> solo memoria (se borra al recargar o cerrar)</div>
       <div><strong style="color:var(--tx2)">Backend:</strong> Google Apps Script</div>
     </div>
   </div>
@@ -630,9 +631,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 // ═══════════════════════════════════════════════════════
 
 const SS_URL = "dg_url";
-const SS_TOK = "dg_tok";
+const LEGACY_SS_TOK = "dg_tok";
 let WURL = sessionStorage.getItem(SS_URL) || "";
-let WTOK = sessionStorage.getItem(SS_TOK) || "";
+let WTOK = "";
+
+// El token no se persiste. Elimina cualquier valor dejado por versiones previas.
+sessionStorage.removeItem(LEGACY_SS_TOK);
 
 let catLoaded = false, catLoading = false;
 let CAT_PLATOS = [], CAT_EXTRAS = [], CAT_CLIENTES = [], CAT_PAGOS = [], CAT_ESTADOS = [], CAT_REPARTIDORES = [];
@@ -764,7 +768,8 @@ function saveConfig0() {
   if (!tok) { msg.className = "msg on er"; msg.innerHTML = "Ingresa el token de acceso"; return; }
   WURL = url; WTOK = tok;
   sessionStorage.setItem(SS_URL, url);
-  sessionStorage.setItem(SS_TOK, tok);
+  sessionStorage.removeItem(LEGACY_SS_TOK);
+  document.getElementById("cfgTok0").value = "";
   hideBanner();
   updateCfgPanel();
   loadCatalog();
@@ -775,7 +780,10 @@ function updateCfgPanel() {
   var urlI = document.getElementById("cfgUrl");
   var tokI = document.getElementById("cfgTok");
   if (urlI) urlI.value = WURL || (DEMO_MODE ? "(modo demostración — sin backend real)" : "");
-  if (tokI) tokI.value = WTOK || (DEMO_MODE ? "" : "");
+  if (tokI) {
+    tokI.value = "";
+    tokI.placeholder = WTOK ? "Token cargado en memoria" : "Token requerido";
+  }
   var badge = document.getElementById("connBadge");
   var hdrSt = document.getElementById("hdrSt");
   var hdrDot = document.getElementById("hdrDot");
@@ -815,10 +823,12 @@ function saveConfig() {
   var url = document.getElementById("cfgUrl").value.trim();
   var tok = document.getElementById("cfgTok").value.trim();
   if (DEMO_MODE) { showMsg("msgConfig","wa","Este mockup corre en modo demostración; la conexión real no está activa."); return; }
-  if (!url || !tok) { showMsg("msgConfig","er","Completa URL y token."); return; }
-  WURL = url; WTOK = tok;
+  if (!url || (!tok && !WTOK)) { showMsg("msgConfig","er","Completa URL y token."); return; }
+  WURL = url;
+  if (tok) WTOK = tok;
   sessionStorage.setItem(SS_URL, url);
-  sessionStorage.setItem(SS_TOK, tok);
+  sessionStorage.removeItem(LEGACY_SS_TOK);
+  document.getElementById("cfgTok").value = "";
   hideMsg("msgConfig");
   hideBanner();
   loadCatalog();
@@ -836,6 +846,29 @@ function fetchTO(url, opts, ms) {
   return fetch(url, Object.assign({}, opts, {signal: ctrl.signal}))
     .then(function(r){ clearTimeout(t); return r; })
     .catch(function(e){ clearTimeout(t); if (e.name === "AbortError") throw new Error("Tiempo de espera agotado."); throw e; });
+}
+
+// Transporte previsto para Egresos: POST text/plain evita exponer el token
+// en la URL. Requiere que el adaptador del backend acepte token en el JSON.
+function apiEGR(accion, data) {
+  if (!WURL || !WTOK) return Promise.reject(new Error("Configura la conexión primero."));
+  var u = new URL(WURL);
+  u.searchParams.set("accion", accion);
+  var payload = Object.assign({
+    action: accion,
+    token: WTOK,
+    request_id: "PWA-" + Date.now() + "-" + Math.random().toString(16).slice(2)
+  }, data || {});
+  return fetchTO(u.toString(), {
+    method: "POST",
+    headers: {"Content-Type":"text/plain;charset=utf-8"},
+    body: JSON.stringify(payload)
+  }, 30000)
+    .then(function(r){ if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function(d){
+      if (d.ok === false) throw new Error(d.message || d.error || "Error desconocido");
+      return d;
+    });
 }
 
 function apiGET(params) {
